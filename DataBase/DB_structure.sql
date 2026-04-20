@@ -62,11 +62,20 @@ CREATE TABLE IF NOT EXISTS user_achievements (
     PRIMARY KEY (user_id, achievement_id)
 );
 
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_attractions_category ON attractions(category_id);
 CREATE INDEX IF NOT EXISTS idx_attractions_city ON attractions(city);
 CREATE INDEX IF NOT EXISTS idx_user_status_user ON user_attraction_status(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_status_attraction ON user_attraction_status(attraction_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_attraction ON reviews(attraction_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token);
 
 INSERT INTO attraction_categories (name, icon_url, color)
 VALUES

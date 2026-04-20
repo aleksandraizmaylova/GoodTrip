@@ -132,8 +132,22 @@
                 return;
             }
 
-            alert("Регистрация успешна. Теперь войдите в аккаунт.");
-            window.location.href = "/login.html";
+            const loginResponse = await fetch("/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: payload.email,
+                    password: payload.password
+                })
+            });
+
+            if (!loginResponse.ok) {
+                alert("Регистрация успешна, но вход не выполнен. Войдите вручную.");
+                window.location.href = "/login.html";
+                return;
+            }
+
+            window.location.href = "/map.html";
         });
     </script>
 </body>

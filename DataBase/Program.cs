@@ -1,6 +1,6 @@
 using TourismApp.Models;
 using Npgsql;
-using System.Text.Json;
+using System.Security.Cryptography;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,8 +31,14 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
 app.MapGet("/", () => Results.Redirect("/login.html"));
 
-app.MapGet("/api/sights/search", async (string query, decimal? lat, decimal? lng, int? radius) =>
+app.MapGet("/api/sights/search", async (HttpRequest request, string query, decimal? lat, decimal? lng, int? radius) =>
 {
+    var currentUser = await GetCurrentUserAsync(connectionString, request);
+    if (currentUser is null)
+    {
+        return Results.Unauthorized();
+    }
+
     if (string.IsNullOrWhiteSpace(query))
     {
         return Results.BadRequest(new { error = "Необходим поисковый запрос" });
@@ -53,6 +59,7 @@ app.MapGet("/api/sights/search", async (string query, decimal? lat, decimal? lng
     return Results.Ok(new
     {
         success = true,
+        requestedBy = new { id = currentUser.Id, username = currentUser.Username, email = currentUser.Email },
         count = filtered.Count,
         data = filtered
     });
@@ -129,16 +136,61 @@ app.MapPost("/api/login", async (HttpRequest request) =>
         return Results.Unauthorized();
     }
 
+    var userId = reader.GetInt32(0);
+    var username = reader.GetString(1);
+    var email = reader.GetString(2);
+
+    var sessionToken = await CreateSessionAsync(connectionString, userId);
+    request.HttpContext.Response.Cookies.Append("auth_token", sessionToken, new CookieOptions
+    {
+        HttpOnly = true,
+        Secure = false,
+        SameSite = SameSiteMode.Lax,
+        Expires = DateTimeOffset.UtcNow.AddDays(7)
+    });
+
     return Results.Ok(new
     {
         success = true,
+        token = sessionToken,
         user = new
         {
-            id = reader.GetInt32(0),
-            username = reader.GetString(1),
-            email = reader.GetString(2)
+            id = userId,
+            username,
+            email
         }
     });
+});
+
+app.MapGet("/api/me", async (HttpRequest request) =>
+{
+    var currentUser = await GetCurrentUserAsync(connectionString, request);
+    if (currentUser is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Ok(new
+    {
+        success = true,
+        user = new { id = currentUser.Id, username = currentUser.Username, email = currentUser.Email }
+    });
+});
+
+app.MapPost("/api/logout", async (HttpRequest request) =>
+{
+    var token = GetTokenFromRequest(request);
+    if (!string.IsNullOrWhiteSpace(token))
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand("DELETE FROM user_sessions WHERE token = @token;", connection);
+        command.Parameters.AddWithValue("token", token);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    request.HttpContext.Response.Cookies.Delete("auth_token");
+    return Results.Ok(new { success = true });
 });
 
 app.Run();
@@ -243,6 +295,73 @@ static async Task<List<ExternalAttraction>> GetAttractionsAsync(string connectio
     return attractions;
 }
 
+static async Task<string> CreateSessionAsync(string connectionString, int userId)
+{
+    var tokenBytes = RandomNumberGenerator.GetBytes(32);
+    var token = Convert.ToBase64String(tokenBytes);
+
+    const string sql = """
+                       INSERT INTO user_sessions (user_id, token, expires_at)
+                       VALUES (@userId, @token, @expiresAt);
+                       """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("userId", userId);
+    command.Parameters.AddWithValue("token", token);
+    command.Parameters.AddWithValue("expiresAt", DateTime.UtcNow.AddDays(7));
+    await command.ExecuteNonQueryAsync();
+
+    return token;
+}
+
+static async Task<CurrentUser?> GetCurrentUserAsync(string connectionString, HttpRequest request)
+{
+    var token = GetTokenFromRequest(request);
+    if (string.IsNullOrWhiteSpace(token))
+    {
+        return null;
+    }
+
+    const string sql = """
+                       SELECT u.id, u.username, u.email
+                       FROM user_sessions s
+                       JOIN users u ON u.id = s.user_id
+                       WHERE s.token = @token AND s.expires_at > NOW()
+                       LIMIT 1;
+                       """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("token", token);
+
+    await using var reader = await command.ExecuteReaderAsync();
+    if (!await reader.ReadAsync())
+    {
+        return null;
+    }
+
+    return new CurrentUser(reader.GetInt32(0), reader.GetString(1), reader.GetString(2));
+}
+
+static string? GetTokenFromRequest(HttpRequest request)
+{
+    if (request.Cookies.TryGetValue("auth_token", out var cookieToken) && !string.IsNullOrWhiteSpace(cookieToken))
+    {
+        return cookieToken;
+    }
+
+    var authHeader = request.Headers.Authorization.ToString();
+    if (authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+    {
+        return authHeader["Bearer ".Length..].Trim();
+    }
+
+    return null;
+}
+
 static async Task EnsureDatabaseInitializedAsync(string connectionString, string contentRootPath)
 {
     var scriptPath = Path.Combine(contentRootPath, "DB_structure.sql");
@@ -276,3 +395,4 @@ static double GeoDistanceMeters(decimal lat1, decimal lon1, decimal lat2, decima
 }
 
 public record AuthPayload(string Username, string Email, string Password);
+public record CurrentUser(int Id, string Username, string Email);
