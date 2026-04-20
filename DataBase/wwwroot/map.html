@@ -19,36 +19,81 @@
             height: 100vh;
         }
 
-        .topbar {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            z-index: 1000;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 8px;
-            padding: 8px 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-        }
-
-        .topbar button {
+        .profile-content button {
+            display: block;
             border: none;
-            background: #d9534f;
-            color: white;
             border-radius: 6px;
             padding: 6px 10px;
+            font-size: 16px;
             cursor: pointer;
+        }
+
+        .profile-content #achievementsBtn {
+            background: #d3d3d3;
+            color: black;
+        }
+
+        .profile-content #logoutBtn {
+            position: absolute;
+            bottom: 20px;
+            background: #d9534f;
+            color: white;
+        }
+
+        .side-checkbox {
+            display: none;
+        }
+
+        #side-button {
+            display: inline-block;
+            padding: 10px 20px;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px 0 0 5px;
+            position: absolute;
+            box-sizing: border-box;
+            top: 0;
+            left: -50px;
+            width: 50px;
+            background-color: gray;
+            margin: 0 0 20px 0;
+        }
+
+        .side-panel {
+            display: inline-block;
+            box-sizing: border-box;
+            position: fixed;
+            top: 0;
+            right: -500px;
+            width: 500px;
+            height: 100vh;
+            background-color: #f4f4f4;
+            transition: right 0.3s ease;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.2);
+            padding: 20px;
+            z-index: 1000;
+        }
+
+        .side-checkbox:checked ~ .side-panel {
+            right: 0;
         }
     </style>
 </head>
 <body>
-    <div class="topbar">
-        <span id="userInfo">Загрузка...</span>
-        <button id="logoutBtn" type="button">Выйти</button>
-    </div>
     <div id="map"></div>
+
+    <input type="checkbox" id="side-checkbox" class="side-checkbox" />
+
+    <div class="side-panel">
+        <label id="side-button" for="side-checkbox"><</label>
+        <div class="profile-content">
+            <h2>Профиль</h2>
+            <p id="username">Загрузка...</p>
+            <p id="email"></p>
+            <button id="achievementsBtn">Достижения</button>
+            <button id="logoutBtn" type="button">Выйти</button>
+        </div>
+    </div>
 
     <script>
         ymaps.ready(init);
@@ -61,7 +106,8 @@
             }
 
             const meResult = await meResponse.json();
-            document.getElementById("userInfo").textContent = `Пользователь: ${meResult.user.username}`;
+            document.getElementById("username").textContent = `Имя: ${meResult.user.username}`;
+            document.getElementById("email").textContent = `Почта: ${meResult.user.email}`;
 
             const myMap = new ymaps.Map("map", {
                 center: [56.8389, 60.6057],
@@ -102,6 +148,19 @@
         document.getElementById("logoutBtn").addEventListener("click", async () => {
             await fetch("/api/logout", { method: "POST" });
             window.location.href = "/login.html";
+        });
+
+        const sideButton = document.getElementById("side-button");
+        sideButton.addEventListener("click", async () => {
+            if (sideButton.textContent === ">") {
+                sideButton.textContent = "<";
+            } else {
+                sideButton.textContent = ">";
+            }
+        });
+
+        document.getElementById("achievementsBtn").addEventListener("click", async () => {
+            window.location.href = "/achievements.html";
         });
     </script>
 </body>
