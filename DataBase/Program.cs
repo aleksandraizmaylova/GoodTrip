@@ -1,5 +1,6 @@
 using TourismApp.Models;
 using Npgsql;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,10 +22,14 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("AllowAll");
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 await EnsureDatabaseInitializedAsync(connectionString, app.Environment.ContentRootPath);
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
+
+app.MapGet("/", () => Results.Redirect("/login.html"));
 
 app.MapGet("/api/sights/search", async (string query, decimal? lat, decimal? lng, int? radius) =>
 {
@@ -53,7 +58,105 @@ app.MapGet("/api/sights/search", async (string query, decimal? lat, decimal? lng
     });
 });
 
+app.MapPost("/api/register", async (HttpRequest request) =>
+{
+    var payload = await ReadAuthPayloadAsync(request);
+
+    if (string.IsNullOrWhiteSpace(payload.Username) ||
+        string.IsNullOrWhiteSpace(payload.Email) ||
+        string.IsNullOrWhiteSpace(payload.Password))
+    {
+        return Results.BadRequest(new { success = false, error = "username, email и password обязательны" });
+    }
+
+    var normalizedEmail = payload.Email.Trim().ToLowerInvariant();
+    var passwordHash = BCrypt.Net.BCrypt.HashPassword(payload.Password);
+
+    const string registerSql = """
+                               INSERT INTO users (username, email, password_hash)
+                               VALUES (@username, @email, @passwordHash)
+                               RETURNING id;
+                               """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(registerSql, connection);
+    command.Parameters.AddWithValue("username", payload.Username.Trim());
+    command.Parameters.AddWithValue("email", normalizedEmail);
+    command.Parameters.AddWithValue("passwordHash", passwordHash);
+
+    try
+    {
+        var userId = (int)(await command.ExecuteScalarAsync() ?? 0);
+        return Results.Ok(new { success = true, userId });
+    }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { success = false, error = "Пользователь с таким email или username уже существует" });
+    }
+});
+
+app.MapPost("/api/login", async (HttpRequest request) =>
+{
+    var payload = await ReadAuthPayloadAsync(request);
+
+    if (string.IsNullOrWhiteSpace(payload.Email) || string.IsNullOrWhiteSpace(payload.Password))
+    {
+        return Results.BadRequest(new { success = false, error = "email и password обязательны" });
+    }
+
+    const string loginSql = """
+                            SELECT id, username, email, password_hash
+                            FROM users
+                            WHERE email = @email
+                            LIMIT 1;
+                            """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(loginSql, connection);
+    command.Parameters.AddWithValue("email", payload.Email.Trim().ToLowerInvariant());
+
+    await using var reader = await command.ExecuteReaderAsync();
+    if (!await reader.ReadAsync())
+    {
+        return Results.Unauthorized();
+    }
+
+    var passwordHash = reader.GetString(3);
+    if (!BCrypt.Net.BCrypt.Verify(payload.Password, passwordHash))
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Ok(new
+    {
+        success = true,
+        user = new
+        {
+            id = reader.GetInt32(0),
+            username = reader.GetString(1),
+            email = reader.GetString(2)
+        }
+    });
+});
+
 app.Run();
+
+static async Task<AuthPayload> ReadAuthPayloadAsync(HttpRequest request)
+{
+    if (request.HasFormContentType)
+    {
+        var form = await request.ReadFormAsync();
+        return new AuthPayload(
+            form["username"].ToString(),
+            form["email"].ToString(),
+            form["password"].ToString());
+    }
+
+    var payload = await request.ReadFromJsonAsync<AuthPayload>();
+    return payload ?? new AuthPayload(string.Empty, string.Empty, string.Empty);
+}
 
 static async Task<List<ExternalAttraction>> GetAttractionsAsync(string connectionString, string query)
 {
@@ -171,3 +274,5 @@ static double GeoDistanceMeters(decimal lat1, decimal lon1, decimal lat2, decima
 
     return earthRadiusKm * c * 1000;
 }
+
+public record AuthPayload(string Username, string Email, string Password);
