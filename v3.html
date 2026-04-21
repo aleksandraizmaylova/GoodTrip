@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта GoodTrip</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9ac4c5f3-c6fb-4988-a311-57d0c53ab4f0&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+        #map { width: 100%; height: 100vh; position: relative; z-index: 1; } 
+
+        .filters-container {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 500; display: flex;
+            align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.95); padding: 10px; border-radius: 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15); overflow-x: auto; max-width: 90vw; scrollbar-width: none;
+        }
+        .filters-container::-webkit-scrollbar { display: none; }
+        .filter-chip {
+            padding: 8px 16px; border-radius: 16px; background: white; border: 1px solid #e5e7eb; cursor: pointer;
+            white-space: nowrap; font-size: 14px; font-weight: 600; color: #4b5563; transition: all 0.2s;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .filter-chip.active { background: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4); }
+        .filter-divider { width: 1px; height: 24px; background: #d1d5db; margin: 0 4px; flex-shrink: 0; }
+
+        .custom-marker {
+            width: 44px; height: 44px; border-radius: 50%; background-size: cover; background-position: center;
+            border: 3px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.3); position: absolute; left: -22px; top: -22px;  
+            transition: all 0.3s ease; display: flex; justify-content: center; align-items: center; font-size: 20px; cursor: pointer;
+        }
+        .custom-marker.marker-visited { border-color: #10b981; box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.3), 0 4px 8px rgba(0,0,0,0.3); }
+        .custom-marker.marker-favorite { border-color: #f43f5e; box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.3), 0 4px 8px rgba(0,0,0,0.3); }
+        .marker-badge {
+            position: absolute; bottom: -6px; right: -6px; background: white; border-radius: 50%; width: 22px; height: 22px;
+            display: flex; align-items: center; justify-content: center; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        #side-panel {
+            position: fixed; top: 0; left: -400px; width: 380px; height: 100vh;
+            background: white; box-shadow: 4px 0 24px rgba(0,0,0,0.15); z-index: 1000; transition: left 0.3s ease;
+            display: flex; flex-direction: column;
+        }
+        #side-panel.open { left: 0; }
+        .close-btn {
+            position: absolute; top: 15px; right: 15px; width: 36px; height: 36px; background: rgba(255,255,255,0.9); border: none; 
+            border-radius: 50%; font-size: 24px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 10; display: flex; 
+            justify-content: center; align-items: center; color: #333;
+        }
+        .panel-header-image {
+            width: 100%; height: 200px; background-color: #f3f4f6; background-size: cover; background-position: center; flex-shrink: 0;
+            background-image: url('https://images.unsplash.com/photo-1513622470522-26c31154c1bc?q=80&w=800&auto=format&fit=crop'); 
+        }
+        .panel-content { padding: 24px; flex-grow: 1; overflow-y: auto; }
+        .badges-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: center; }
+        .category-badge { background-color: #e0e7ff; color: #3730a3; padding: 6px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; text-transform: uppercase; }
+        .rating-badge { background-color: #fef3c7; color: #d97706; padding: 6px 10px; border-radius: 12px; font-size: 14px; font-weight: bold; }
+        .status-badge { padding: 6px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; }
+        .status-visited { background-color: #d1fae5; color: #065f46; } 
+        .status-unvisited { background-color: #f3f4f6; color: #4b5563; } 
+        .status-fav-active { background-color: #ffe4e6; color: #be123c; } 
+        .status-fav-inactive { display: none; } 
+        .place-title { margin: 0 0 16px 0; font-size: 24px; color: #111827; line-height: 1.2; }
+        .place-desc { font-size: 15px; color: #4b5563; line-height: 1.6; margin: 0 0 20px 0; }
+        .place-address { font-size: 14px; color: #6b7280; padding-top: 16px; border-top: 1px solid #e5e7eb; display: flex; align-items: center; gap: 8px; }
+        .panel-footer { padding: 20px 24px; border-top: 1px solid #e5e7eb; background: white; display: flex; flex-direction: column; gap: 10px; }
+        .action-btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 15px; font-weight: bold; cursor: pointer; transition: all 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        .btn-mark-visited { background-color: #10b981; color: white; } .btn-mark-visited:hover { background-color: #059669; }
+        .btn-mark-unvisited { background-color: #ef4444; color: white; } .btn-mark-unvisited:hover { background-color: #dc2626; }
+        .btn-fav-active { background-color: #f43f5e; color: white; } .btn-fav-active:hover { background-color: #e11d48; }
+        .btn-fav-inactive { background-color: white; color: #374151; border: 2px solid #e5e7eb; padding: 12px; } .btn-fav-inactive:hover { background-color: #f9fafb; border-color: #d1d5db; }
+
+        @media (max-width: 768px) {
+            #side-panel { width: 100%; height: 75vh; top: auto; left: 0; bottom: -100%; border-radius: 24px 24px 0 0; }
+            #side-panel.open { bottom: 0; left: 0; }
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="filters-container">
+        <button class="filter-chip active" id="filter-all" onclick="toggleAllCategories()">🌍 Все</button>
+        <button class="filter-chip filter-cat active" data-cat="museum" onclick="toggleCategory('museum')">🏛️ Музеи</button>
+        <button class="filter-chip filter-cat active" data-cat="park" onclick="toggleCategory('park')">🌳 Парки</button>
+        <button class="filter-chip filter-cat active" data-cat="monument" onclick="toggleCategory('monument')">🗿 Памятники</button>
+        <button class="filter-chip filter-cat active" data-cat="temple" onclick="toggleCategory('temple')">⛪ Храмы</button>
+        
+        <div class="filter-divider"></div>
+        
+        <button class="filter-chip" id="filter-fav" onclick="toggleStatus('favorites')">❤️ В планах</button>
+        <button class="filter-chip" id="filter-vis" onclick="toggleStatus('visited')">✅ Посещено</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div id="side-panel">
+        <button class="close-btn" onclick="closePanel()">×</button>
+        <div class="panel-header-image" id="panel-image"></div>
+        <div class="panel-content">
+            <div class="badges-row">
+                <span class="category-badge" id="panel-category"></span>
+                <span class="rating-badge" id="panel-rating"></span>
+                <span class="status-badge" id="panel-visited-status"></span>
+                <span class="status-badge" id="panel-favorite-status"></span>
+            </div>
+            <h2 class="place-title" id="panel-title"></h2>
+            <p class="place-desc" id="panel-desc"></p>
+            <div class="place-address" id="panel-address"></div>
+        </div>
+        <div class="panel-footer">
+            <button id="btn-toggle-favorite" class="action-btn" onclick="toggleFavorite()"></button>
+            <button id="btn-toggle-visited" class="action-btn" onclick="toggleVisited()"></button>
+        </div>
+    </div>
+
+    <script>
+        ymaps.ready(init);
+
+        const categoryToEng = { "музей": "museum", "парк": "park", "памятник": "monument", "достопримечательность": "attraction", "храм": "temple" };
+        const bgColors = { "музей": "#ef4444", "парк": "#10b981", "памятник": "#eab308", "храм": "#f97316", "default": "#3b82f6" };
+        const emojis = { "музей": "🏛️", "парк": "🌳", "памятник": "🗿", "храм": "⛪", "default": "📍" };
+
+        let visitedPlaces = JSON.parse(localStorage.getItem('goodtrip_visited')) || [];
+        let favoritePlaces = JSON.parse(localStorage.getItem('goodtrip_favorites')) || [];
+        let currentPlaceId = null; 
+        let mapPlacemarks = {};
+
+        const allAvailableCats = ["museum", "park", "monument", "temple"];
+        let activeCategories = new Set(allAvailableCats);
+        let filterFav = false;
+        let filterVis = false;
+
+        function toggleCategory(cat) {
+            if (activeCategories.has(cat)) activeCategories.delete(cat);
+            else activeCategories.add(cat);
+            updateFiltersUI();
+        }
+
+        function toggleAllCategories() {
+            if (activeCategories.size === allAvailableCats.length) {
+                activeCategories.clear();
+            } else {
+                allAvailableCats.forEach(c => activeCategories.add(c));
+            }
+            updateFiltersUI();
+        }
+
+        function toggleStatus(status) {
+            if (status === 'favorites') filterFav = !filterFav;
+            if (status === 'visited') filterVis = !filterVis;
+            updateFiltersUI();
+        }
+
+        function updateFiltersUI() {
+            const allBtn = document.getElementById('filter-all');
+            if (activeCategories.size === allAvailableCats.length) allBtn.classList.add('active');
+            else allBtn.classList.remove('active');
+
+            document.querySelectorAll('.filter-cat').forEach(btn => {
+                const cat = btn.getAttribute('data-cat');
+                if (activeCategories.has(cat)) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+
+            document.getElementById('filter-fav').classList.toggle('active', filterFav);
+            document.getElementById('filter-vis').classList.toggle('active', filterVis);
+
+            updateMarkersOnMap();
+        }
+
+        function updatePanelUI() {
+            const isVisited = visitedPlaces.includes(currentPlaceId);
+            const isFavorite = favoritePlaces.includes(currentPlaceId);
+
+            const visitedBadge = document.getElementById('panel-visited-status');
+            const toggleVisitedBtn = document.getElementById('btn-toggle-visited');
+            const favBadge = document.getElementById('panel-favorite-status');
+            const toggleFavBtn = document.getElementById('btn-toggle-favorite');
+
+            if (isVisited) {
+                visitedBadge.textContent = '✅ Посещено'; visitedBadge.className = 'status-badge status-visited';
+                toggleVisitedBtn.textContent = 'Убрать из посещенных'; toggleVisitedBtn.className = 'action-btn btn-mark-unvisited';
+                toggleFavBtn.style.display = 'none'; favBadge.className = 'status-badge status-fav-inactive';
+            } else {
+                visitedBadge.textContent = 'Не посещено'; visitedBadge.className = 'status-badge status-unvisited';
+                toggleVisitedBtn.textContent = '✅ Отметить как посещенное'; toggleVisitedBtn.className = 'action-btn btn-mark-visited';
+                toggleFavBtn.style.display = 'flex';
+                
+                if (isFavorite) {
+                    favBadge.textContent = '❤️ В планах'; favBadge.className = 'status-badge status-fav-active';
+                    toggleFavBtn.textContent = '❤️ Убрать из планов'; toggleFavBtn.className = 'action-btn btn-fav-active';
+                } else {
+                    favBadge.className = 'status-badge status-fav-inactive';
+                    toggleFavBtn.textContent = '🤍 Хочу посетить'; toggleFavBtn.className = 'action-btn btn-fav-inactive';
+                }
+            }
+        }
+
+        function updateMarkersOnMap() {
+            for (let id in mapPlacemarks) {
+                const placemark = mapPlacemarks[id].instance;
+                const placeData = mapPlacemarks[id].rawData;
+
+                const isVis = visitedPlaces.includes(id);
+                const isFav = favoritePlaces.includes(id);
+
+                let statusClass = '';
+                let badgeHtml = '';
+
+                if (isVis) {
+                    statusClass = 'marker-visited';
+                    badgeHtml = '<div class="marker-badge">✅</div>';
+                } else if (isFav) {
+                    statusClass = 'marker-favorite';
+                    badgeHtml = '<div class="marker-badge">❤️</div>';
+                }
+
+                placemark.properties.set('statusClass', statusClass);
+                placemark.properties.set('badgeHtml', badgeHtml);
+
+                let isVisible = true;
+                const ruCat = (placeData.category || "").toLowerCase().trim();
+                const cat = categoryToEng[ruCat] || "default";
+
+                if (cat !== "default" && !activeCategories.has(cat)) isVisible = false;
+                if (cat === "default" && activeCategories.size === 0) isVisible = false;
+                if (filterFav && !isFav) isVisible = false;
+                if (filterVis && !isVis) isVisible = false;
+
+                placemark.options.set('visible', isVisible);
+
+                if (!isVisible && currentPlaceId === id) {
+                    closePanel();
+                }
+            }
+        }
+
+        function toggleVisited() {
+            if (!currentPlaceId) return;
+            const index = visitedPlaces.indexOf(currentPlaceId);
+            if (index > -1) {
+                visitedPlaces.splice(index, 1);
+            } else {
+                visitedPlaces.push(currentPlaceId);
+                const favIndex = favoritePlaces.indexOf(currentPlaceId);
+                if (favIndex > -1) favoritePlaces.splice(favIndex, 1); 
+                localStorage.setItem('goodtrip_favorites', JSON.stringify(favoritePlaces));
+            }
+            localStorage.setItem('goodtrip_visited', JSON.stringify(visitedPlaces));
+            updatePanelUI();
+            updateMarkersOnMap();
+        }
+
+        function toggleFavorite() {
+            if (!currentPlaceId) return;
+            const index = favoritePlaces.indexOf(currentPlaceId);
+            if (index > -1) favoritePlaces.splice(index, 1);
+            else favoritePlaces.push(currentPlaceId);
+            localStorage.setItem('goodtrip_favorites', JSON.stringify(favoritePlaces));
+            updatePanelUI();
+            updateMarkersOnMap();
+        }
+
+        function openPanel(place) {
+            currentPlaceId = place.id; 
+            document.getElementById('panel-title').innerText = place.name;
+            document.getElementById('panel-desc').innerText = place.description;
+            document.getElementById('panel-address').innerHTML = `📍 ${place.address}`;
+            document.getElementById('panel-category').innerText = place.category || 'Место';
+            document.getElementById('panel-rating').innerText = `★ ${place.rating ? place.rating.toFixed(1) : 'Нет оценки'}`;
+            
+            updatePanelUI(); 
+            document.getElementById('side-panel').classList.add('open');
+        }
+
+        function closePanel() {
+            document.getElementById('side-panel').classList.remove('open');
+            currentPlaceId = null;
+        }
+
+        function init() {
+            var myMap = new ymaps.Map("map", {
+                center: [57.5, 34.0],
+                zoom: 5,
+                controls: ['geolocationControl']
+            });
+            
+            var zoomControl = new ymaps.control.ZoomControl({ options: { position: { right: 10, top: 100 } } });
+            myMap.controls.add(zoomControl);
+            myMap.events.add('click', function () { closePanel(); });
+
+            const CustomMarkerLayout = ymaps.templateLayoutFactory.createClass(
+                '<div class="custom-marker $[properties.statusClass]" ' +
+                'style="background-color: $[properties.bgColor]; ' +
+                '{% if properties.iconUrl %}background-image: url(\'$[properties.iconUrl]\');{% endif %}">' +
+                    '$[properties.emoji]' +
+                    '$[properties.badgeHtml]' +
+                '</div>'
+            );
+
+            const result = {
+                "success": true,
+                "count": 3,
+                "data": [
+                    { "id": "1", "name": "Третьяковская галерея", "description": "Художественный музей с коллекцией русского искусства", "latitude": 55.7414, "longitude": 37.6189, "address": "Москва, Лаврушинский пер., 10", "category": "Музей", "rating": 5.0 },
+                    { "id": "4", "name": "Московский зоопарк", "description": "Один из старейших зоопарков Европы и четвертый по площади в России.", "latitude": 55.7623, "longitude": 37.5772, "address": "Москва, Б. Грузинская, 1", "category": "Парк", "rating": 4.8 },
+                    { "id": "5", "name": "Эрмитаж", "description": "Один из крупнейших и самых значительных художественных и культурно-исторических музеев мира.", "latitude": 59.9398, "longitude": 30.3146, "address": "Санкт-Петербург, Дворцовая наб., 34", "category": "Музей", "rating": 4.9 }
+                ]
+            };
+
+            if (result.success && result.data) {
+                result.data.forEach(place => {
+                    const catStr = (place.category || "").toLowerCase().trim();
+                    const engName = categoryToEng[catStr] || "default";
+                    const imageUrl = `logo_${engName}.png`; 
+                    const bgColor = bgColors[engName] || bgColors["default"];
+
+                    const img = new Image();
+                    
+                    const buildPlacemark = (finalImageUrl, emoji) => {
+                        var placemark = new ymaps.Placemark(
+                            [place.latitude, place.longitude], 
+                            { 
+                                hintContent: place.name, iconUrl: finalImageUrl, bgColor: bgColor, emoji: emoji,
+                                statusClass: '', badgeHtml: ''    
+                            },
+                            { iconLayout: CustomMarkerLayout, iconShape: { type: 'Circle', coordinates: [0, 0], radius: 22 } }
+                        );
+                        
+                        placemark.events.add('click', function () { openPanel(place); });
+                        myMap.geoObjects.add(placemark);
+                        mapPlacemarks[place.id] = { instance: placemark, rawData: place };
+                    };
+
+                    img.onload = function() { buildPlacemark(imageUrl, ""); };
+                    img.onerror = function() { const fallbackEmoji = emojis[engName] || emojis["default"]; buildPlacemark("", fallbackEmoji); };
+                    img.src = imageUrl;
+                });
+                
+                setTimeout(updateMarkersOnMap, 300); 
+            }
+        }
+    </script>
+</body>
+</html>
