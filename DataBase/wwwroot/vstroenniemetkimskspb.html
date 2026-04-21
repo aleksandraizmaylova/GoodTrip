@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Тест Карты GoodTrip</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9ac4c5f3-c6fb-4988-a311-57d0c53ab4f0&lang=ru_RU" type="text/javascript"></script>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
+        #map { width: 100%; height: 100vh; } 
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script>
+        ymaps.ready(init);
+
+        function init() {
+            // Создаем карту. Центрируем где-то между Москвой и Питером
+            var myMap = new ymaps.Map("map", {
+                center: [57.5, 34.0],
+                zoom: 5
+            });
+
+            // Твой JSON, который ты прислал (имитируем ответ от бэкенда)
+            const result = {
+                "success": true,
+                "count": 3,
+                "data": [
+                    {
+                        "id": "1",
+                        "name": "Третьяковская галерея",
+                        "description": "Художественный музей с коллекцией русского искусства",
+                        "latitude": 55.74140000,
+                        "longitude": 37.61890000,
+                        "address": "Москва, Лаврушинский пер., 10",
+                        "category": "Музей",
+                        "rating": 5.0,
+                        "coordinates": { "lat": 55.74140000, "lng": 37.61890000 }
+                    },
+                    {
+                        "id": "4",
+                        "name": "Государственный исторический музей",
+                        "description": "Крупнейший национальный исторический музей России",
+                        "latitude": 55.75580000,
+                        "longitude": 37.62110000,
+                        "address": "Москва, Красная площадь, 1",
+                        "category": "Музей",
+                        "rating": 5.0,
+                        "coordinates": { "lat": 55.75580000, "lng": 37.62110000 }
+                    },
+                    {
+                        "id": "5",
+                        "name": "Эрмитаж",
+                        "description": "Один из крупнейших художественных музеев мира",
+                        "latitude": 59.93980000,
+                        "longitude": 30.31460000,
+                        "address": "Санкт-Петербург, Дворцовая наб., 34",
+                        "category": "Музей",
+                        "rating": 5.0,
+                        "coordinates": { "lat": 59.93980000, "lng": 30.31460000 }
+                    }
+                ]
+            };
+
+            // Логика добавления меток на карту
+            if (result.success && result.data) {
+                // Перебираем каждый элемент массива data
+                result.data.forEach(place => {
+                    
+                    // Создаем метку для каждого места
+                    var placemark = new ymaps.Placemark(
+                        // Передаем координаты: широту и долготу
+                        [place.latitude, place.longitude], 
+                        {
+                            // Заполняем информацию для клика по метке
+                            balloonContentHeader: `<b>${place.name}</b>`,
+                            balloonContentBody: `<p>${place.description}</p>`,
+                            balloonContentFooter: place.address,
+                            hintContent: place.category
+                        }, 
+                        {
+                            preset: 'islands#blueIcon' // Синяя иконка
+                        }
+                    );
+                    
+                    // Добавляем созданную метку на карту
+                    myMap.geoObjects.add(placemark);
+                });
+            }
+        }
+    </script>
+</body>
+</html>

@@ -29,7 +29,7 @@ await EnsureDatabaseInitializedAsync(connectionString, app.Environment.ContentRo
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
-app.MapGet("/", () => Results.Redirect("/login.html"));
+app.MapGet("/", () => Results.Redirect("/v3.html"));
 
 app.MapGet("/api/sights/search", async (HttpRequest request, string query, decimal? lat, decimal? lng, int? radius) =>
 {
