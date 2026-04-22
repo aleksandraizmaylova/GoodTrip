@@ -29,14 +29,22 @@ const info = document.getElementById('achievement-panel');
 
 for (const el of document.getElementsByClassName('achievement')) {
     const icon =  el.querySelector('.achievement-icon');
-    if (achievements[el.id]["get"] !== 'Не получено') {
+    const achievement = achievements[el.id];
+    if (achievement["get"] !== 'Не получено') {
         icon.style.filter = 'none';
     }
+    el.querySelector('.achievement-text').textContent = achievement['name'];
     icon.addEventListener('click', (e) => {
         e.preventDefault();
-        openInfo(achievements[el.id]);
+        openInfo(achievement);
     })
 }
+
+// const meResponse = await fetch("/api/me");
+// if (!meResponse.ok) {
+//     alert('Авторизуйтесь, чтобы просматривать достижения')
+//     window.location.href = "/login.html";
+// }
 
 function openInfo(achievement) {
     closeProfile();
@@ -45,4 +53,8 @@ function openInfo(achievement) {
     info.querySelector('#a-description').textContent = achievement['description'];
     info.querySelector('#a-percent').textContent = `Процент выполнения: ${achievement['percent']}`;
     info.querySelector('#a-get').textContent = achievement['get'] ?? 'Не получено';
+}
+
+function closeInfo(){
+    info.style.display = "none";
 }

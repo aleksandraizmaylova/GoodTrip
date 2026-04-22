@@ -1,14 +1,36 @@
+body {
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f0f4f8;
+}
+
+header {
+    padding: 10px;
+    text-align: center;
+    background-color: white;
+    margin-bottom: 30px;
+}
+
 .achievements-container {
+    margin: 10px;
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     gap: 20px;
 }
 
+.achievement-text {
+    font-size: large;
+}
+
 .achievement {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
     text-align: center;
     padding: 20px;
-    border: 1px solid lightgray;
+    background-color: white;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
 }
 
 .achievement-icon {
@@ -19,17 +41,47 @@
 }
 .achievement-icon:hover {
     box-shadow: #6b7280 0 0 10px;
-    filter: grayscale(50%);
 }
 
 #achievement-panel{
     display: none;
     background: white;
-    border: 1px solid lightgray;
+    border-radius: 12px;
     position: absolute;
+    width: 60%;
+    max-width: 400px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    padding: 40px;
 
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
 
+}
+
+/*#achievement-image {*/
+/*    background-image: src("./img/achieve1.jpg");*/
+/*    border: solid black 1px;*/
+/*    width: 100%;*/
+/*    height: 100px;*/
+/*}*/
+
+#a-name-desc {
+    padding: 0;
+    display: inline-block;
+    flex-direction: column;
+    text-align: center;
+    width: 100%;
+}
+
+#a-name {margin: 5px;}
+#a-description {
+    margin: 5px;
+    color: gray;
+}
+
+.close-btn {
+    position: absolute; top: 15px; right: 15px; width: 36px; height: 36px; background: rgba(255,255,255,0.9); border: none;
+    border-radius: 50%; font-size: 24px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 10; display: flex;
+    justify-content: center; align-items: center; color: #333;
 }
