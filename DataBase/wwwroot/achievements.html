@@ -2,9 +2,51 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Достижения GoodTrip</title>
+    <link rel="stylesheet" href="css/profile.css">
+    <link rel="stylesheet" href="css/achievements.css">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Segoe UI', Roboto, sans-serif; overflow: auto; }
+    </style>
 </head>
 <body>
-    <h1>Achievements</h1>
+<header>
+    <h1>Мои достижения</h1>
+</header>
+<div class="achievements-container">
+    <div class="achievement" id="achievement1">
+        <img class="achievement-icon" src="img/achieve1.jpeg" alt="achieve1">
+        <div class="achievement-text">Достижение 1</div>
+    </div>
+    <div class="achievement" id="achievement2">
+        <img class="achievement-icon" src="img/achieve2.jpeg" alt="achieve2">
+        <div class="achievement-text">Достижение 2</div>
+    </div>
+    <div class="achievement" id="achievement3">
+        <img class="achievement-icon" src="img/achieve3.jpeg" alt="achieve3">
+        <div class="achievement-text">Достижение 3</div>
+    </div>
+
+</div>
+
+
+<div id="profile-panel">
+    <button class="profile-btn" onclick="switchProfile()">
+        <i class="fa fa-user"></i>
+    </button>
+    <div class="profile-content">
+        <h2>Профиль</h2>
+        <div>
+            <p id="username"></p>
+            <p id="email"></p>
+        </div>
+        <button id="loginBtn" class="action-btn btn-fav-inactive">Войти</button>
+        <button id="attractionListBtn" class="action-btn btn-fav-inactive">Список достопримечательностей</button>
+        <button id="achievementsBtn" class="action-btn btn-fav-inactive">Мои достижения</button>
+        <button id="logoutBtn" class="action-btn btn-fav-active">Выйти</button>
+    </div>
+</div>
+
+<script src="js/profile.js"></script>
 </body>
 </html>

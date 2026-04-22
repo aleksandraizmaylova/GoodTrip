@@ -1,0 +1,22 @@
+.achievements-container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-evenly;
+    gap: 20px;
+}
+
+.achievement {
+    text-align: center;
+    border: 1px solid lightgray;
+}
+
+.achievement-icon {
+    /*border: solid transparent 10px;*/
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+}
+.achievement-icon:hover {
+    box-shadow: #6b7280 0 0 10px;
+    /*border: solid blue 10px;*/
+}
