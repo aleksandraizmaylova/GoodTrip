@@ -1,22 +1,35 @@
 .achievements-container {
     display: flex;
     flex-wrap: wrap;
-    justify-content: space-evenly;
+    justify-content: center;
     gap: 20px;
 }
 
 .achievement {
     text-align: center;
+    padding: 20px;
     border: 1px solid lightgray;
 }
 
 .achievement-icon {
-    /*border: solid transparent 10px;*/
     width: 150px;
     height: 150px;
     border-radius: 50%;
+    filter: grayscale(100%);
 }
 .achievement-icon:hover {
     box-shadow: #6b7280 0 0 10px;
-    /*border: solid blue 10px;*/
+    filter: grayscale(50%);
+}
+
+#achievement-panel{
+    display: none;
+    background: white;
+    border: 1px solid lightgray;
+    position: absolute;
+
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
 }

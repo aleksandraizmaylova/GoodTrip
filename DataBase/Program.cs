@@ -193,6 +193,15 @@ app.MapPost("/api/logout", async (HttpRequest request) =>
     return Results.Ok(new { success = true });
 });
 
+app.MapPost("api/achievements", async (HttpRequest request) => // это заглушка, хочу отправлять юзера и получать кучу всего (см achievements.js)
+{
+    return Results.Ok(new
+    {
+        success = true,
+        achievements = new[] { }
+    });
+});
+
 app.Run();
 
 static async Task<AuthPayload> ReadAuthPayloadAsync(HttpRequest request)
