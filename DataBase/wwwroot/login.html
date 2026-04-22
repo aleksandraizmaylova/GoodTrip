@@ -128,7 +128,13 @@
 
             const result = await response.json();
             alert(`Вы вошли как ${result.user.username}`);
-            window.location.href = "/v3.html";
+            const prev = document.referrer;
+            console.log(prev);
+            if (!prev || prev.includes('register.html')) {
+                window.location.href = "/v3.html";
+            } else {
+                window.location.href = prev;
+            }
         });
     </script>
 </body>

@@ -198,7 +198,7 @@ app.MapPost("api/achievements", async (HttpRequest request) => // это заг�
     return Results.Ok(new
     {
         success = true,
-        achievements = new[] { }
+        achievements = new[] { 0 }
     });
 });
 

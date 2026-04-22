@@ -1,15 +1,15 @@
 async function configureProfile() {
     const meResponse = await fetch("/api/me");
-    if (meResponse.ok) {
-        const meResult = await meResponse.json();
-        document.getElementById("username").textContent = `Имя: ${meResult.user.username}`;
-        document.getElementById("email").textContent = `Почта: ${meResult.user.email}`;
-        document.getElementById("loginBtn").style.display = 'none';
-    } else {
+    if (!meResponse.ok) {
         document.getElementById("username").style.display = 'none';
         document.getElementById("email").style.display = 'none';
         document.getElementById("logoutBtn").style.display = 'none';
+        return;
     }
+    const meResult = await meResponse.json();
+    document.getElementById("username").textContent = `Имя: ${meResult.user.username}`;
+    document.getElementById("email").textContent = `Почта: ${meResult.user.email}`;
+    document.getElementById("loginBtn").style.display = 'none';
 }
 
 function closeProfile() {
@@ -27,12 +27,18 @@ function switchProfile(){
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
     await fetch("/api/logout", { method: "POST" });
-    window.location.href = "/v3.html";
+    location.reload();
 });
 
-document.getElementById("loginBtn").addEventListener("click", async () => {
-    await fetch("/api/login", { method: "POST" });
-    window.location.href = "/login.html";
+for (const loginBtn of document.getElementsByClassName("loginBtn")) {
+    loginBtn.addEventListener("click", async () => {
+        await fetch("/api/login", { method: "POST" });
+        window.location.href = "/login.html";
+    });
+}
+
+document.getElementById("mapBtn").addEventListener("click", async () => {
+    window.location.href = "/v3.html";
 });
 
 document.getElementById("achievementsBtn").addEventListener("click", async () => {

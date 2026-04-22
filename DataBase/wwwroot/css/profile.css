@@ -1,9 +1,7 @@
 @import "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css";
 
-.action-btn {
+.simple-btn {
     width: 100%;
-    padding: 14px;
-    border: none;
     border-radius: 12px;
     font-size: 15px;
     font-weight: bold;
@@ -13,43 +11,42 @@
     justify-content: center;
     align-items: center;
     gap: 8px;
-}
-
-.btn-fav-active {
-    background-color: #f43f5e;
-    color: white;
-}
-.btn-fav-active:hover {
-    background-color: #e11d48;
-}
-
-.btn-fav-inactive {
     background-color: white;
     color: #374151;
     border: 2px solid #e5e7eb;
     padding: 12px;
 }
-.btn-fav-inactive:hover {
+
+.simple-btn:hover {
     background-color: #f9fafb;
     border-color: #d1d5db;
 }
 
+.simple-btn:disabled {
+    background-color: #d1d5db;
+    border-color: #d1d5db;
+}
 
-
-#loginBtn {
+.loginBtn {
     background-color: #3b82f6;
     color: white;
     border: #0056b3;
 }
 
-#loginBtn:hover {
+.loginBtn:hover {
     background-color: #0056b3;
 }
 
 #logoutBtn {
+    background-color: #f43f5e;
+    color: white;
+    border: none;
     position: absolute;
     bottom: 20px;
     width: calc(100% - 48px);
+}
+#logoutBtn:hover {
+    background-color: #e11d48;
 }
 
 .profile-btn {

@@ -28,9 +28,8 @@
     </div>
 </div>
 
-<div id="achievement-panel">
+<div id="achievement-info" class="modal">
     <button class="close-btn" onclick="closeInfo()">x</button>
-<!--    <div id="achievement-image"></div>-->
     <div id="a-name-desc">
         <h2 id="a-name"></h2>
         <p id="a-description"></p>
@@ -38,6 +37,13 @@
     <p id="a-get"></p>
     <p id="a-percent"></p>
 </div>
+
+<div id="achievement-info-not-auth" class="modal">
+    <button class="close-btn" onclick="closeInfo()">x</button>
+    <h2 style="font-weight: normal">Войдите, чтобы просматривать достижения</h2>
+    <button class="simple-btn loginBtn">Войти</button>
+</div>
+
 <div id="profile-panel">
     <button class="profile-btn" onclick="switchProfile()">
         <i class="fa fa-user"></i>
@@ -48,10 +54,11 @@
             <p id="username"></p>
             <p id="email"></p>
         </div>
-        <button id="loginBtn" class="action-btn btn-fav-inactive">Войти</button>
-        <button id="attractionListBtn" class="action-btn btn-fav-inactive">Список достопримечательностей</button>
-        <button id="achievementsBtn" class="action-btn btn-fav-inactive">Мои достижения</button>
-        <button id="logoutBtn" class="action-btn btn-fav-active">Выйти</button>
+        <button id="loginBtn" class="simple-btn loginBtn">Войти</button>
+        <button id="mapBtn" class="simple-btn">Карта</button>
+        <button id="attractionListBtn" class="simple-btn" disabled>Список достопримечательностей</button>
+        <button id="achievementsBtn" class="simple-btn" style="display: none">Мои достижения</button>
+        <button id="logoutBtn" class="simple-btn">Выйти</button>
     </div>
 </div>
 
