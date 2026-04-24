@@ -3,39 +3,24 @@ const infoNotAuth = document.getElementById('achievement-info-not-auth');
 let auth = false;
 
 async function init() {
-    // const achievedResponse = await fetch('/api/achievements', {method: 'POST'});
-    // const result = await achievedResponse.json();
-    // const achieved = result.achieved;
-    const achievements = {
-        "achievement1": {
-            "id": "achievement1",
-            'name': 'Первый шаг',
-            'get': 'Получено: 22.04.2026',
-            "percent": '52.67',
-            'description': 'Зарегистрируйтесь на сайте'
-        },
-        "achievement2": {
-            "id": "achievement2",
-            'name': 'Святой',
-            'get': 'Не получено',
-            "percent": '6.66',
-            'description': 'Посетите 5 храмов'
-        },
-        "achievement3": {
-            "id": "achievement3",
-            'name': 'Знаток',
-            'get': 'Получено: 22.04.2026',
-            "percent": '14.88',
-            'description': 'Предложите свою достопримечательность'
+    let achievements = {};
+    try {
+        const achievedResponse = await fetch('/api/achievements', { method: 'POST' });
+        auth = achievedResponse.ok;
+        if (auth) {
+            const result = await achievedResponse.json();
+            achievements = result.achievements || {};
         }
-    };
+    } catch (e) {
+        console.error('Не удалось загрузить достижения:', e);
+    }
 
     const meResponse = await fetch("/api/me");
     auth = meResponse.ok;
 
     for (const el of document.getElementsByClassName('achievement')) {
         const icon =  el.querySelector('.achievement-icon');
-        const achievement = achievements[el.id];
+        const achievement = achievements[el.id] || { name: el.id, get: 'Не получено', percent: '0.00', description: '' };
         if (auth && achievement["get"] !== 'Не получено') {
             icon.style.filter = 'none';
         }

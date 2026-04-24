@@ -31,7 +31,7 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
 app.MapGet("/", () => Results.Redirect("/v3.html"));
 
-app.MapGet("/api/sights/search", async (HttpRequest request, string query, decimal? lat, decimal? lng, int? radius) =>
+app.MapGet("/api/sights/search", async (HttpRequest request, string? query, decimal? lat, decimal? lng, int? radius) =>
 {
     var currentUser = await GetCurrentUserAsync(connectionString, request);
     if (currentUser is null)
@@ -39,13 +39,9 @@ app.MapGet("/api/sights/search", async (HttpRequest request, string query, decim
         return Results.Unauthorized();
     }
 
-    if (string.IsNullOrWhiteSpace(query))
-    {
-        return Results.BadRequest(new { error = "Необходим поисковый запрос" });
-    }
-
     var searchRadius = radius ?? 1000;
-    var attractions = await GetAttractionsAsync(connectionString, query.Trim());
+    var normalizedQuery = string.IsNullOrWhiteSpace(query) ? string.Empty : query.Trim();
+    var attractions = await GetAttractionsAsync(connectionString, normalizedQuery);
 
     var filtered = attractions;
 
@@ -193,13 +189,94 @@ app.MapPost("/api/logout", async (HttpRequest request) =>
     return Results.Ok(new { success = true });
 });
 
-app.MapPost("api/achievements", async (HttpRequest request) => // это заглушка, хочу отправлять юзера и получать кучу всего (см achievements.js)
+app.MapPost("/api/achievements", async (HttpRequest request) => // заглушка под ачивки
 {
+    var currentUser = await GetCurrentUserAsync(connectionString, request);
+    if (currentUser is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var achievements = await GetAchievementsPayloadAsync(connectionString, currentUser.Id);
     return Results.Ok(new
     {
         success = true,
-        achievements = new[] { 0 }
+        user = new { id = currentUser.Id, username = currentUser.Username, email = currentUser.Email },
+        achievements
     });
+});
+
+app.MapGet("/api/user/attraction-status", async (HttpRequest request) =>
+{
+    var currentUser = await GetCurrentUserAsync(connectionString, request);
+    if (currentUser is null) return Results.Unauthorized();
+
+    const string sql = """
+                       SELECT attraction_id, status
+                       FROM user_attraction_status
+                       WHERE user_id = @userId;
+                       """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("userId", currentUser.Id);
+
+    var planned = new List<int>();
+    var visited = new List<int>();
+
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        var attractionId = reader.GetInt32(0);
+        var status = reader.GetString(1);
+        if (status == "planned") planned.Add(attractionId);
+        if (status == "visited") visited.Add(attractionId);
+    }
+
+    return Results.Ok(new { success = true, planned, visited });
+});
+
+app.MapPost("/api/attractions/{attractionId:int}/status", async (HttpRequest request, int attractionId) =>
+{
+    var currentUser = await GetCurrentUserAsync(connectionString, request);
+    if (currentUser is null) return Results.Unauthorized();
+
+    var payload = await request.ReadFromJsonAsync<AttractionStatusPayload>();
+    var status = payload?.Status?.Trim();
+    if (string.IsNullOrWhiteSpace(status) || status is not ("not_visited" or "planned" or "visited"))
+    {
+        return Results.BadRequest(new { success = false, error = "status must be one of: not_visited, planned, visited" });
+    }
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+
+    if (status == "not_visited")
+    {
+        await using var deleteCmd = new NpgsqlCommand(
+            "DELETE FROM user_attraction_status WHERE user_id = @userId AND attraction_id = @attractionId;",
+            connection);
+        deleteCmd.Parameters.AddWithValue("userId", currentUser.Id);
+        deleteCmd.Parameters.AddWithValue("attractionId", attractionId);
+        await deleteCmd.ExecuteNonQueryAsync();
+        return Results.Ok(new { success = true, status });
+    }
+
+    const string upsertSql = """
+                             INSERT INTO user_attraction_status (user_id, attraction_id, status, updated_at)
+                             VALUES (@userId, @attractionId, @status, NOW())
+                             ON CONFLICT (user_id, attraction_id)
+                             DO UPDATE SET status = EXCLUDED.status, updated_at = NOW();
+                             """;
+
+    await using var upsertCmd = new NpgsqlCommand(upsertSql, connection);
+    upsertCmd.Parameters.AddWithValue("userId", currentUser.Id);
+    upsertCmd.Parameters.AddWithValue("attractionId", attractionId);
+    upsertCmd.Parameters.AddWithValue("status", status);
+    await upsertCmd.ExecuteNonQueryAsync();
+
+    return Results.Ok(new { success = true, status });
 });
 
 app.Run();
@@ -386,6 +463,73 @@ static async Task EnsureDatabaseInitializedAsync(string connectionString, string
     await command.ExecuteNonQueryAsync();
 }
 
+static async Task<Dictionary<string, object>> GetAchievementsPayloadAsync(string connectionString, int userId)
+{
+    const string sql = """
+                       WITH totals AS (
+                         SELECT COUNT(*)::decimal AS total_users
+                         FROM users
+                       ),
+                       achieved AS (
+                         SELECT a.id AS achievement_id, a.code, COUNT(ua.user_id)::decimal AS achieved_users
+                         FROM achievements a
+                         LEFT JOIN user_achievements ua ON ua.achievement_id = a.id
+                         GROUP BY a.id, a.code
+                       ),
+                       me AS (
+                         SELECT a.code, ua.earned_at
+                         FROM achievements a
+                         LEFT JOIN user_achievements ua
+                           ON ua.achievement_id = a.id AND ua.user_id = @userId
+                       )
+                       SELECT
+                         a.code,
+                         a.name,
+                         a.description,
+                         COALESCE(a.icon_url, '') AS img,
+                         m.earned_at,
+                         CASE
+                           WHEN t.total_users = 0 THEN 0
+                           ELSE ROUND((ac.achieved_users / t.total_users) * 100.0, 2)
+                         END AS percent
+                       FROM achievements a
+                       JOIN achieved ac ON ac.achievement_id = a.id
+                       CROSS JOIN totals t
+                       JOIN me m ON m.code = a.code
+                       WHERE a.code IS NOT NULL
+                       ORDER BY a.id;
+                       """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("userId", userId);
+
+    var result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        var code = reader.GetString(0);
+        var name = reader.GetString(1);
+        var description = reader.GetString(2);
+        var img = reader.GetString(3);
+        var earnedAt = reader.IsDBNull(4) ? (DateTime?)null : reader.GetDateTime(4);
+        var percent = reader.GetDecimal(5);
+
+        result[code] = new
+        {
+            id = code,
+            name,
+            description,
+            img,
+            get = earnedAt.HasValue ? earnedAt.Value.ToString("yyyy-MM-dd") : "Не получено",
+            percent = percent.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
+        };
+    }
+
+    return result;
+}
+
 static double GeoDistanceMeters(decimal lat1, decimal lon1, decimal lat2, decimal lon2)
 {
     const double earthRadiusKm = 6371;
@@ -405,3 +549,4 @@ static double GeoDistanceMeters(decimal lat1, decimal lon1, decimal lat2, decima
 
 public record AuthPayload(string Username, string Email, string Password);
 public record CurrentUser(int Id, string Username, string Email);
+public record AttractionStatusPayload(string Status);

@@ -32,7 +32,6 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 
 for (const loginBtn of document.getElementsByClassName("loginBtn")) {
     loginBtn.addEventListener("click", async () => {
-        await fetch("/api/login", { method: "POST" });
         window.location.href = "/login.html";
     });
 }

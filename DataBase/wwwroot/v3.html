@@ -138,8 +138,8 @@
     const bgColors = { "музей": "#ef4444", "парк": "#10b981", "памятник": "#eab308", "храм": "#f97316", "default": "#3b82f6" };
     const emojis = { "музей": "🏛️", "парк": "🌳", "памятник": "🗿", "храм": "⛪", "default": "📍" };
 
-    let visitedPlaces = JSON.parse(localStorage.getItem('goodtrip_visited')) || [];
-    let favoritePlaces = JSON.parse(localStorage.getItem('goodtrip_favorites')) || [];
+    let visitedPlaces = [];
+    let favoritePlaces = [];
     let currentPlaceId = null;
     let mapPlacemarks = {};
 
@@ -253,28 +253,46 @@
         }
     }
 
-    function toggleVisited() {
+    async function toggleVisited() {
         if (!currentPlaceId) return;
-        const index = visitedPlaces.indexOf(currentPlaceId);
-        if (index > -1) {
-            visitedPlaces.splice(index, 1);
+        const isVisited = visitedPlaces.includes(currentPlaceId);
+        const nextStatus = isVisited ? "not_visited" : "visited";
+
+        const response = await fetch(`/api/attractions/${currentPlaceId}/status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: nextStatus })
+        });
+        if (!response.ok) return;
+
+        if (isVisited) {
+            visitedPlaces = visitedPlaces.filter(x => x !== currentPlaceId);
         } else {
             visitedPlaces.push(currentPlaceId);
-            const favIndex = favoritePlaces.indexOf(currentPlaceId);
-            if (favIndex > -1) favoritePlaces.splice(favIndex, 1);
-            localStorage.setItem('goodtrip_favorites', JSON.stringify(favoritePlaces));
+            favoritePlaces = favoritePlaces.filter(x => x !== currentPlaceId);
         }
-        localStorage.setItem('goodtrip_visited', JSON.stringify(visitedPlaces));
         updatePanelUI();
         updateMarkersOnMap();
     }
 
-    function toggleFavorite() {
+    async function toggleFavorite() {
         if (!currentPlaceId) return;
-        const index = favoritePlaces.indexOf(currentPlaceId);
-        if (index > -1) favoritePlaces.splice(index, 1);
-        else favoritePlaces.push(currentPlaceId);
-        localStorage.setItem('goodtrip_favorites', JSON.stringify(favoritePlaces));
+        const isFavorite = favoritePlaces.includes(currentPlaceId);
+        const nextStatus = isFavorite ? "not_visited" : "planned";
+
+        const response = await fetch(`/api/attractions/${currentPlaceId}/status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: nextStatus })
+        });
+        if (!response.ok) return;
+
+        if (isFavorite) {
+            favoritePlaces = favoritePlaces.filter(x => x !== currentPlaceId);
+        } else {
+            favoritePlaces.push(currentPlaceId);
+            visitedPlaces = visitedPlaces.filter(x => x !== currentPlaceId);
+        }
         updatePanelUI();
         updateMarkersOnMap();
     }
@@ -298,6 +316,16 @@
 
     async function init() {
         await configureProfile();
+        try {
+            const statusResponse = await fetch("/api/user/attraction-status");
+            if (statusResponse.ok) {
+                const statusResult = await statusResponse.json();
+                visitedPlaces = (statusResult.visited || []).map(x => x.toString());
+                favoritePlaces = (statusResult.planned || []).map(x => x.toString());
+            }
+        } catch (e) {
+            console.error("Не удалось загрузить статусы пользователя:", e);
+        }
 
         var myMap = new ymaps.Map("map", {
             center: [57.5, 34.0],
@@ -321,17 +349,20 @@
             '</div>'
         );
 
-        const result = {
-            "success": true,
-            "count": 3,
-            "data": [
-                { "id": "1", "name": "Третьяковская галерея", "description": "Художественный музей с коллекцией русского искусства", "latitude": 55.7414, "longitude": 37.6189, "address": "Москва, Лаврушинский пер., 10", "category": "Музей", "rating": 5.0 },
-                { "id": "4", "name": "Московский зоопарк", "description": "Один из старейших зоопарков Европы и четвертый по площади в России.", "latitude": 55.7623, "longitude": 37.5772, "address": "Москва, Б. Грузинская, 1", "category": "Парк", "rating": 4.8 },
-                { "id": "5", "name": "Эрмитаж", "description": "Один из крупнейших и самых значительных художественных и культурно-исторических музеев мира.", "latitude": 59.9398, "longitude": 30.3146, "address": "Санкт-Петербург, Дворцовая наб., 34", "category": "Музей", "rating": 4.9 }
-            ]
-        };
+        let result;
+        try {
+            const response = await fetch("/api/sights/search");
+            if (response.status === 401) {
+                window.location.href = "/login.html";
+                return;
+            }
+            result = await response.json();
+        } catch (e) {
+            console.error("Не удалось загрузить данные для карты:", e);
+            return;
+        }
 
-        if (result.success && result.data) {
+        if (result && result.success && result.data) {
             result.data.forEach(place => {
                 const catStr = (place.category || "").toLowerCase().trim();
                 const engName = categoryToEng[catStr] || "default";
@@ -342,7 +373,7 @@
 
                 const buildPlacemark = (finalImageUrl, emoji) => {
                     var placemark = new ymaps.Placemark(
-                        [place.latitude, place.longitude],
+                        [place.coordinates.lat, place.coordinates.lng],
                         {
                             hintContent: place.name, iconUrl: finalImageUrl, bgColor: bgColor, emoji: emoji,
                             statusClass: '', badgeHtml: ''
