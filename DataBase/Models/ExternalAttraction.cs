@@ -10,7 +10,8 @@ public record ExternalAttraction(
     decimal Longitude,
     string Address,
     string Category,
-    decimal Rating)
+    decimal Rating,
+    string Status = "not_visited")
 {
     public Coordinates Coordinates { get; } = new(Latitude, Longitude);
 }

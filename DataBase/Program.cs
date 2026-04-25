@@ -41,7 +41,7 @@ app.MapGet("/api/sights/search", async (HttpRequest request, string? query, deci
 
     var searchRadius = radius ?? 1000;
     var normalizedQuery = string.IsNullOrWhiteSpace(query) ? string.Empty : query.Trim();
-    var attractions = await GetAttractionsAsync(connectionString, normalizedQuery);
+    var attractions = await GetAttractionsAsync(connectionString, normalizedQuery, currentUser.Id);
 
     var filtered = attractions;
 
@@ -296,7 +296,7 @@ static async Task<AuthPayload> ReadAuthPayloadAsync(HttpRequest request)
     return payload ?? new AuthPayload(string.Empty, string.Empty, string.Empty);
 }
 
-static async Task<List<ExternalAttraction>> GetAttractionsAsync(string connectionString, string query)
+static async Task<List<ExternalAttraction>> GetAttractionsAsync(string connectionString, string query, int? userId = null)
 {
     var attractions = new List<ExternalAttraction>();
     const string sql = """
@@ -308,16 +308,18 @@ static async Task<List<ExternalAttraction>> GetAttractionsAsync(string connectio
                            a.longitude,
                            COALESCE(a.address, '') AS address,
                            COALESCE(c.name, 'Без категории') AS category,
-                           COALESCE(AVG(r.rating), 0) AS rating
+                           COALESCE(AVG(r.rating), 0) AS rating,
+                           COALESCE(uas.status, 'not_visited') AS status
                        FROM attractions a
                        LEFT JOIN attraction_categories c ON c.id = a.category_id
                        LEFT JOIN reviews r ON r.attraction_id = a.id
+                       LEFT JOIN user_attraction_status uas ON uas.attraction_id = a.id AND uas.user_id = @userId
                        WHERE
                            a.name ILIKE @searchPattern OR
                            COALESCE(a.short_description, '') ILIKE @searchPattern OR
                            COALESCE(a.full_description, '') ILIKE @searchPattern OR
                            COALESCE(c.name, '') ILIKE @searchPattern
-                       GROUP BY a.id, a.name, description, a.latitude, a.longitude, address, category
+                       GROUP BY a.id, a.name, description, a.latitude, a.longitude, address, category, uas.status
                        ORDER BY a.id;
                        """;
 
@@ -325,6 +327,7 @@ static async Task<List<ExternalAttraction>> GetAttractionsAsync(string connectio
     await connection.OpenAsync();
     await using var command = new NpgsqlCommand(sql, connection);
     command.Parameters.AddWithValue("searchPattern", $"%{query}%");
+    command.Parameters.AddWithValue("userId", userId ?? (object)DBNull.Value);
 
     await using var reader = await command.ExecuteReaderAsync();
     while (await reader.ReadAsync())
@@ -337,7 +340,8 @@ static async Task<List<ExternalAttraction>> GetAttractionsAsync(string connectio
             reader.GetDecimal(4),
             reader.GetString(5),
             reader.GetString(6),
-            reader.GetDecimal(7)));
+            reader.GetDecimal(7),
+            reader.GetString(8)));
     }
 
     if (attractions.Count > 0)
@@ -355,15 +359,18 @@ static async Task<List<ExternalAttraction>> GetAttractionsAsync(string connectio
                                    a.longitude,
                                    COALESCE(a.address, '') AS address,
                                    COALESCE(c.name, 'Без категории') AS category,
-                                   COALESCE(AVG(r.rating), 0) AS rating
+                                   COALESCE(AVG(r.rating), 0) AS rating,
+                                   COALESCE(uas.status, 'not_visited') AS status
                                FROM attractions a
                                LEFT JOIN attraction_categories c ON c.id = a.category_id
                                LEFT JOIN reviews r ON r.attraction_id = a.id
-                               GROUP BY a.id, a.name, description, a.latitude, a.longitude, address, category
+                               LEFT JOIN user_attraction_status uas ON uas.attraction_id = a.id AND uas.user_id = @userId
+                               GROUP BY a.id, a.name, description, a.latitude, a.longitude, address, category, uas.status
                                ORDER BY a.id;
                                """;
 
     await using var fallbackCommand = new NpgsqlCommand(fallbackSql, connection);
+    fallbackCommand.Parameters.AddWithValue("userId", userId ?? (object)DBNull.Value);
     await using var fallbackReader = await fallbackCommand.ExecuteReaderAsync();
     while (await fallbackReader.ReadAsync())
     {
@@ -375,7 +382,8 @@ static async Task<List<ExternalAttraction>> GetAttractionsAsync(string connectio
             fallbackReader.GetDecimal(4),
             fallbackReader.GetString(5),
             fallbackReader.GetString(6),
-            fallbackReader.GetDecimal(7)));
+            fallbackReader.GetDecimal(7),
+            fallbackReader.GetString(8)));
     }
 
     return attractions;
