@@ -43,3 +43,13 @@ document.getElementById("mapBtn").addEventListener("click", async () => {
 document.getElementById("achievementsBtn").addEventListener("click", async () => {
     window.location.href = "/achievements.html";
 });
+
+document.getElementById("suggestBtn").addEventListener("click", async () => {
+    try {
+        await fetch("/api/propose-attraction", { method: "POST" });
+    } catch (e) {
+        // Достижение не критично для открытия формы
+    }
+    window.open('https://forms.gle/GLiTuTrcFvYkT57E9', '_blank');
+});
+

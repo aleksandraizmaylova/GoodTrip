@@ -206,6 +206,28 @@ app.MapPost("/api/achievements", async (HttpRequest request) => // заглуш�
     });
 });
 
+app.MapPost("/api/propose-attraction", async (HttpRequest request) =>
+{
+    var currentUser = await GetCurrentUserAsync(connectionString, request);
+    if (currentUser is null) return Results.Unauthorized();
+
+    const string sql = """
+                       INSERT INTO user_achievements (user_id, achievement_id, earned_at)
+                       SELECT @userId, a.id, NOW()
+                       FROM achievements a
+                       WHERE a.code = 'achievement13'
+                       ON CONFLICT DO NOTHING;
+                       """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("userId", currentUser.Id);
+    await command.ExecuteNonQueryAsync();
+
+    return Results.Ok(new { success = true });
+});
+
 app.MapGet("/api/user/attraction-status", async (HttpRequest request) =>
 {
     var currentUser = await GetCurrentUserAsync(connectionString, request);
