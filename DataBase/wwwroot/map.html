@@ -3,165 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GoodTrip Map</title>
+    <title>Карта GoodTrip</title>
     <script src="https://api-maps.yandex.ru/2.1/?apikey=9ac4c5f3-c6fb-4988-a311-57d0c53ab4f0&lang=ru_RU" type="text/javascript"></script>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        }
-
-        #map {
-            width: 100%;
-            height: 100vh;
-        }
-
-        .profile-content button {
-            display: block;
-            border: none;
-            border-radius: 6px;
-            padding: 6px 10px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        .profile-content #achievementsBtn {
-            background: #d3d3d3;
-            color: black;
-        }
-
-        .profile-content #logoutBtn {
-            position: absolute;
-            bottom: 20px;
-            background: #d9534f;
-            color: white;
-        }
-
-        .side-checkbox {
-            display: none;
-        }
-
-        #side-button {
-            display: inline-block;
-            padding: 10px 20px;
-            color: white;
-            cursor: pointer;
-            border-radius: 5px 0 0 5px;
-            position: absolute;
-            box-sizing: border-box;
-            top: 0;
-            left: -50px;
-            width: 50px;
-            background-color: gray;
-            margin: 0 0 20px 0;
-        }
-
-        .side-panel {
-            display: inline-block;
-            box-sizing: border-box;
-            position: fixed;
-            top: 0;
-            right: -500px;
-            width: 500px;
-            height: 100vh;
-            background-color: #f4f4f4;
-            transition: right 0.3s ease;
-            box-shadow: -2px 0 5px rgba(0,0,0,0.2);
-            padding: 20px;
-            z-index: 1000;
-        }
-
-        .side-checkbox:checked ~ .side-panel {
-            right: 0;
-        }
-    </style>
+    <link rel="stylesheet" href="css/profile.css">
+    <link rel="stylesheet" href="css/map.css">
 </head>
 <body>
-    <div id="map"></div>
 
-    <input type="checkbox" id="side-checkbox" class="side-checkbox" />
+<div class="filters-container">
+    <button class="filter-chip active" id="filter-all" onclick="toggleAllCategories()">🌍 Все</button>
+    <button class="filter-chip filter-cat active" data-cat="museum" onclick="toggleCategory('museum')">🏛️ Музеи</button>
+    <button class="filter-chip filter-cat active" data-cat="park" onclick="toggleCategory('park')">🌳 Парки</button>
+    <button class="filter-chip filter-cat active" data-cat="monument" onclick="toggleCategory('monument')">🗿 Памятники</button>
+    <button class="filter-chip filter-cat active" data-cat="temple" onclick="toggleCategory('temple')">⛪ Храмы</button>
 
-    <div class="side-panel">
-        <label id="side-button" for="side-checkbox"><</label>
-        <div class="profile-content">
-            <h2>Профиль</h2>
-            <p id="username">Загрузка...</p>
+    <div class="filter-divider"></div>
+
+    <button class="filter-chip" id="filter-fav" onclick="toggleStatus('favorites')">❤️ В планах</button>
+    <button class="filter-chip" id="filter-vis" onclick="toggleStatus('visited')">✅ Посещено</button>
+</div>
+
+<div id="map"></div>
+
+<div id="profile-panel">
+    <button class="profile-btn" onclick="switchProfile()">
+        <i class="fa fa-user"></i>
+    </button>
+    <div class="profile-content">
+        <h2>Профиль</h2>
+        <div>
+            <p id="username"></p>
             <p id="email"></p>
-            <button id="achievementsBtn">Достижения</button>
-            <button id="logoutBtn" type="button">Выйти</button>
         </div>
+        <button id="loginBtn" class="simple-btn loginBtn">Войти</button>
+        <button id="mapBtn" class="simple-btn" style="display: none">Карта</button>
+        <button id="attractionListBtn" class="simple-btn" disabled>Список достопримечательностей</button>
+        <button id="achievementsBtn" class="simple-btn">Мои достижения</button>
+        <button id="suggestBtn" class="simple-btn">Предложить достопримечательность</button>
+        <button id="logoutBtn" class="simple-btn">Выйти</button>
     </div>
+</div>
 
-    <script>
-        ymaps.ready(init);
-
-        async function init() {
-            const meResponse = await fetch("/api/me");
-            if (!meResponse.ok) {
-                window.location.href = "/login.html";
-                return;
-            }
-
-            const meResult = await meResponse.json();
-            document.getElementById("username").textContent = `Имя: ${meResult.user.username}`;
-            document.getElementById("email").textContent = `Почта: ${meResult.user.email}`;
-
-            const myMap = new ymaps.Map("map", {
-                center: [56.8389, 60.6057],
-                zoom: 5
-            });
-
-            try {
-                const response = await fetch("/api/sights/search?query=музей");
-                if (response.status === 401) {
-                    window.location.href = "/login.html";
-                    return;
-                }
-
-                const result = await response.json();
-                if (!result.success || !result.data) {
-                    return;
-                }
-
-                result.data.forEach((place) => {
-                    const placemark = new ymaps.Placemark(
-                        [place.coordinates.lat, place.coordinates.lng],
-                        {
-                            balloonContentHeader: `<b>${place.name}</b>`,
-                            balloonContentBody: `<p>${place.description}</p><p>Рейтинг: ${place.rating}</p>`,
-                            balloonContentFooter: place.address,
-                            hintContent: place.category
-                        },
-                        { preset: "islands#blueIcon" }
-                    );
-
-                    myMap.geoObjects.add(placemark);
-                });
-            } catch (error) {
-                console.error("Ошибка при получении данных с бэкенда GoodTrip:", error);
-            }
-        }
-
-        document.getElementById("logoutBtn").addEventListener("click", async () => {
-            await fetch("/api/logout", { method: "POST" });
-            window.location.href = "/login.html";
-        });
-
-        const sideButton = document.getElementById("side-button");
-        sideButton.addEventListener("click", async () => {
-            if (sideButton.textContent === ">") {
-                sideButton.textContent = "<";
-            } else {
-                sideButton.textContent = ">";
-            }
-        });
-
-        document.getElementById("achievementsBtn").addEventListener("click", async () => {
-            window.location.href = "/achievements.html";
-        });
-    </script>
+<div id="side-panel">
+    <button class="close-btn" onclick="closePanel()">×</button>
+    <div class="panel-header-image" id="panel-image"></div>
+    <div class="panel-content">
+        <div class="badges-row">
+            <span class="category-badge" id="panel-category"></span>
+            <span class="rating-badge" id="panel-rating"></span>
+            <span class="status-badge" id="panel-visited-status"></span>
+            <span class="status-badge" id="panel-favorite-status"></span>
+        </div>
+        <h2 class="place-title" id="panel-title"></h2>
+        <p class="place-desc" id="panel-desc"></p>
+        <div class="place-address" id="panel-address"></div>
+    </div>
+    <div class="panel-footer">
+        <button id="btn-toggle-favorite" class="action-btn" onclick="toggleFavorite()"></button>
+        <button id="btn-toggle-visited" class="action-btn" onclick="toggleVisited()"></button>
+    </div>
+</div>
+<script src="js/profile.js"></script>
+<script src="js/map.js"></script>
 </body>
 </html>

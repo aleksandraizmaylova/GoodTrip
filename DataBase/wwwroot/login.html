@@ -4,88 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Вход - GoodTrip</title>
-    <style>
-        body {
-            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f4f8;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-        }
-
-        .auth-container {
-            background-color: #ffffff;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 350px;
-        }
-
-        .auth-container h2 {
-            text-align: center;
-            color: #333;
-            margin-top: 0;
-            margin-bottom: 25px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #555;
-            font-size: 14px;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 16px;
-        }
-
-        .form-group input:focus {
-            border-color: #007bff;
-            outline: none;
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 12px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            margin-top: 10px;
-        }
-
-        .submit-btn:hover {
-            background-color: #0056b3;
-        }
-
-        .switch-link {
-            display: block;
-            text-align: center;
-            margin-top: 20px;
-            color: #007bff;
-            text-decoration: none;
-            font-size: 14px;
-        }
-
-        .switch-link:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <link rel="stylesheet" href="css/login.css">
 </head>
 <body>
 
@@ -105,37 +24,6 @@
         </form>
     </div>
 
-    <script>
-        const loginForm = document.getElementById("loginForm");
-        loginForm.addEventListener("submit", async (event) => {
-            event.preventDefault();
-
-            const payload = {
-                email: document.getElementById("email").value.trim(),
-                password: document.getElementById("password").value
-            };
-
-            const response = await fetch("/api/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                alert("Неверный email или пароль");
-                return;
-            }
-
-            const result = await response.json();
-            alert(`Вы вошли как ${result.user.username}`);
-            const prev = document.referrer;
-            console.log(prev);
-            if (!prev || prev.includes('register.html')) {
-                window.location.href = "/v3.html";
-            } else {
-                window.location.href = prev;
-            }
-        });
-    </script>
+    <script src="js/login.js"></script>
 </body>
 </html>

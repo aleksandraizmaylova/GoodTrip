@@ -37,7 +37,7 @@ for (const loginBtn of document.getElementsByClassName("loginBtn")) {
 }
 
 document.getElementById("mapBtn").addEventListener("click", async () => {
-    window.location.href = "/v3.html";
+    window.location.href = "/map.html";
 });
 
 document.getElementById("achievementsBtn").addEventListener("click", async () => {
