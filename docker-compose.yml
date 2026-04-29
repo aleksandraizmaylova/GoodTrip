@@ -15,20 +15,20 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: el111/goodtrip-api:latest
     container_name: goodtrip-api
     depends_on:
       db:
         condition: service_healthy
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=tourism_app;Username=postgres;Password=postgres
     ports:
       - "8080:8080"
+    restart: unless-stopped
 
 volumes:
   postgres_data:
