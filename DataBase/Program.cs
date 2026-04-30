@@ -486,8 +486,27 @@ static async Task EnsureDatabaseInitializedAsync(string connectionString, string
         throw new FileNotFoundException("Database initialization script was not found.", scriptPath);
     }
 
+    // Connect with backoff to avoid restart-loops on VM when Postgres isn't ready yet.
+    // Fail fast on wrong credentials (28P01), because retries won't help.
     await using var connection = new NpgsqlConnection(connectionString);
-    await connection.OpenAsync();
+    var delayMs = 500;
+    while (true)
+    {
+        try
+        {
+            await connection.OpenAsync();
+            break;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.InvalidPassword)
+        {
+            throw;
+        }
+        catch
+        {
+            await Task.Delay(delayMs);
+            delayMs = Math.Min(delayMs * 2, 10_000);
+        }
+    }
 
     // IMPORTANT: Do not execute the full DB_structure.sql on every API start.
     // On hosting/restarts this can cause heavy locks/CPU load and make Postgres appear "down".
