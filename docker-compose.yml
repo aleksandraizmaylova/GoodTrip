@@ -6,8 +6,10 @@ services:
       POSTGRES_DB: tourism_app
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+    # SECURITY/SAFETY: do not expose Postgres publicly on hosting.
+    # If you need local access for debugging, use:
+    # ports:
+    #   - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

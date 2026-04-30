@@ -486,11 +486,49 @@ static async Task EnsureDatabaseInitializedAsync(string connectionString, string
         throw new FileNotFoundException("Database initialization script was not found.", scriptPath);
     }
 
-    var sqlScript = await File.ReadAllTextAsync(scriptPath);
     await using var connection = new NpgsqlConnection(connectionString);
     await connection.OpenAsync();
-    await using var command = new NpgsqlCommand(sqlScript, connection);
-    await command.ExecuteNonQueryAsync();
+
+    // IMPORTANT: Do not execute the full DB_structure.sql on every API start.
+    // On hosting/restarts this can cause heavy locks/CPU load and make Postgres appear "down".
+    // Use an advisory lock so multiple API instances don't initialize concurrently.
+    const long initLockKey = 912345678901234567; // arbitrary constant, stable across deployments
+
+    await using (var lockCmd = new NpgsqlCommand("SELECT pg_advisory_lock(@k);", connection))
+    {
+        lockCmd.Parameters.AddWithValue("k", initLockKey);
+        await lockCmd.ExecuteNonQueryAsync();
+    }
+
+    try
+    {
+        const string schemaExistsSql = """
+                                       SELECT EXISTS (
+                                         SELECT 1
+                                         FROM information_schema.tables
+                                         WHERE table_schema = 'public' AND table_name = 'users'
+                                       );
+                                       """;
+
+        await using var existsCmd = new NpgsqlCommand(schemaExistsSql, connection);
+        var existsObj = await existsCmd.ExecuteScalarAsync();
+        var schemaExists = existsObj is bool b && b;
+
+        if (schemaExists)
+        {
+            return;
+        }
+
+        var sqlScript = await File.ReadAllTextAsync(scriptPath);
+        await using var command = new NpgsqlCommand(sqlScript, connection);
+        await command.ExecuteNonQueryAsync();
+    }
+    finally
+    {
+        await using var unlockCmd = new NpgsqlCommand("SELECT pg_advisory_unlock(@k);", connection);
+        unlockCmd.Parameters.AddWithValue("k", initLockKey);
+        await unlockCmd.ExecuteNonQueryAsync();
+    }
 }
 
 static async Task<Dictionary<string, object>> GetAchievementsPayloadAsync(string connectionString, int userId)
