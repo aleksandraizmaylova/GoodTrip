@@ -67,8 +67,8 @@
     position: fixed;
     box-sizing: border-box;
     top: 0;
-    right: -500px;
-    width: 500px;
+    right: max(-500px, -45%);
+    width: min(500px, 45%);
     height: 100vh;
     transition: right 0.3s ease;
     background-color: white;
@@ -95,4 +95,13 @@
 .fa-user{
     font-size: 20px;
     padding: 8px 16px;
+}
+
+@media (max-width: 425px) {
+    .simple-btn {
+        font-size: 8px;
+        padding: 6px;
+        border-radius: 6px;
+        gap: 4px;
+    }
 }
