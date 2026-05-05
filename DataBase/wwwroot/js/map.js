@@ -129,7 +129,10 @@ async function toggleVisited() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus })
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+        document.getElementById('visited-info-not-auth').style.display = 'block';
+        return;
+    }
 
     if (isVisited) {
         visitedPlaces = visitedPlaces.filter(x => x !== currentPlaceId);
@@ -151,7 +154,10 @@ async function toggleFavorite() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus })
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+        document.getElementById('fav-info-not-auth').style.display = 'block';
+        return;
+    }
 
     if (isFavorite) {
         favoritePlaces = favoritePlaces.filter(x => x !== currentPlaceId);
@@ -180,6 +186,11 @@ function closePanel() {
     currentPlaceId = null;
 }
 
+function closeInfo(){
+    document.getElementById('fav-info-not-auth').style.display = 'none';
+    document.getElementById('visited-info-not-auth').style.display = 'none';
+}
+
 async function init() {
     await configureProfile();
     try {
@@ -194,8 +205,8 @@ async function init() {
     }
 
     var myMap = new ymaps.Map("map", {
-        center: [57.5, 34.0],
-        zoom: 5,
+        center: [58.0, 61.5],
+        zoom: 7,
         controls: ['geolocationControl']
     });
 
@@ -218,10 +229,6 @@ async function init() {
     let result;
     try {
         const response = await fetch("/api/sights/search");
-        if (response.status === 401) {
-            window.location.href = "/login.html";
-            return;
-        }
         result = await response.json();
     } catch (e) {
         console.error("Не удалось загрузить данные для карты:", e);

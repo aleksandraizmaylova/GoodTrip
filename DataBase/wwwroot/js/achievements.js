@@ -24,8 +24,6 @@ async function init() {
         if (auth && achievement["get"] !== 'Не получено') {
             icon.style.filter = 'none';
         }
-        el.querySelector('.achievement-text').textContent = achievement['name'];
-        el.querySelector('.achievement-icon').src = achievement['img'];
         icon.addEventListener('click', (e) => {
             e.preventDefault();
             openInfo(achievement);

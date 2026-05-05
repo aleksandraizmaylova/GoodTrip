@@ -29,19 +29,15 @@ await EnsureDatabaseInitializedAsync(connectionString, app.Environment.ContentRo
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
-app.MapGet("/", () => Results.Redirect("/v3.html"));
+app.MapGet("/", () => Results.Redirect("/map.html"));
 
 app.MapGet("/api/sights/search", async (HttpRequest request, string? query, decimal? lat, decimal? lng, int? radius) =>
 {
     var currentUser = await GetCurrentUserAsync(connectionString, request);
-    if (currentUser is null)
-    {
-        return Results.Unauthorized();
-    }
 
     var searchRadius = radius ?? 1000;
     var normalizedQuery = string.IsNullOrWhiteSpace(query) ? string.Empty : query.Trim();
-    var attractions = await GetAttractionsAsync(connectionString, normalizedQuery, currentUser.Id);
+    var attractions = await GetAttractionsAsync(connectionString, normalizedQuery, currentUser?.Id);
 
     var filtered = attractions;
 
@@ -55,7 +51,9 @@ app.MapGet("/api/sights/search", async (HttpRequest request, string? query, deci
     return Results.Ok(new
     {
         success = true,
-        requestedBy = new { id = currentUser.Id, username = currentUser.Username, email = currentUser.Email },
+        requestedBy = currentUser is null
+            ? null
+            : new { id = currentUser.Id, username = currentUser.Username, email = currentUser.Email },
         count = filtered.Count,
         data = filtered
     });
@@ -189,7 +187,7 @@ app.MapPost("/api/logout", async (HttpRequest request) =>
     return Results.Ok(new { success = true });
 });
 
-app.MapPost("/api/achievements", async (HttpRequest request) => // заглушка под ачивки
+app.MapPost("/api/achievements", async (HttpRequest request) =>
 {
     var currentUser = await GetCurrentUserAsync(connectionString, request);
     if (currentUser is null)
