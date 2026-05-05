@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Карта GoodTrip</title>
+    <script src="https://api-maps.yandex.ru/2.1/?apikey=9ac4c5f3-c6fb-4988-a311-57d0c53ab4f0&lang=ru_RU" type="text/javascript"></script>
+    <link rel="stylesheet" href="css/profile.css">
+    <link rel="stylesheet" href="css/map.css">
+</head>
+<body>
+
+<div class="filters-container">
+    <button class="filter-chip active" id="filter-all" onclick="toggleAllCategories()">🌍 Все</button>
+    <button class="filter-chip filter-cat active" data-cat="museum" onclick="toggleCategory('museum')">🏛️ Музеи</button>
+    <button class="filter-chip filter-cat active" data-cat="park" onclick="toggleCategory('park')">🌳 Парки</button>
+    <button class="filter-chip filter-cat active" data-cat="monument" onclick="toggleCategory('monument')">🗿 Памятники</button>
+    <button class="filter-chip filter-cat active" data-cat="temple" onclick="toggleCategory('temple')">⛪ Храмы</button>
+
+    <div class="filter-divider"></div>
+
+    <button class="filter-chip" id="filter-fav" onclick="toggleStatus('favorites')">❤️ В планах</button>
+    <button class="filter-chip" id="filter-vis" onclick="toggleStatus('visited')">✅ Посещено</button>
+</div>
+
+<div id="map"></div>
+
+<div id="profile-panel">
+    <button class="profile-btn" onclick="switchProfile()">
+        <i class="fa fa-user"></i>
+    </button>
+    <div class="profile-content">
+        <h2>Профиль</h2>
+        <div>
+            <p id="username"></p>
+            <p id="email"></p>
+        </div>
+        <button id="loginBtn" class="simple-btn loginBtn">Войти</button>
+        <button id="mapBtn" class="simple-btn" style="display: none">Карта</button>
+        <button id="attractionListBtn" class="simple-btn" disabled>Список мест</button>
+        <button id="achievementsBtn" class="simple-btn">Мои достижения</button>
+        <button id="suggestBtn" class="simple-btn">Предложить место</button>
+        <button id="logoutBtn" class="simple-btn">Выйти</button>
+    </div>
+</div>
+
+<div id="side-panel">
+    <button class="close-btn" onclick="closePanel()">×</button>
+    <div class="panel-header-image" id="panel-image"></div>
+    <div class="panel-content">
+        <div class="badges-row">
+            <span class="category-badge" id="panel-category"></span>
+            <span class="rating-badge" id="panel-rating"></span>
+            <span class="status-badge" id="panel-visited-status"></span>
+            <span class="status-badge" id="panel-favorite-status"></span>
+        </div>
+        <h2 class="place-title" id="panel-title"></h2>
+        <p class="place-desc" id="panel-desc"></p>
+        <div class="place-address" id="panel-address"></div>
+    </div>
+    <div class="panel-footer">
+        <button id="btn-toggle-favorite" class="action-btn" onclick="toggleFavorite()"></button>
+        <button id="btn-toggle-visited" class="action-btn" onclick="toggleVisited()"></button>
+    </div>
+</div>
+<script src="js/profile.js"></script>
+<script src="js/map.js"></script>
+</body>
+</html>

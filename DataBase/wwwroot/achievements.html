@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Достижения GoodTrip</title>
+    <link rel="stylesheet" href="css/profile.css">
+    <link rel="stylesheet" href="css/achievements.css">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Segoe UI', Roboto, sans-serif; overflow: auto; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Мои достижения</h1>
+</header>
+<div class="achievements-container">
+    <div class="achievement" id="achievement1">
+        <img class="achievement-icon" src="img/achievement1.jpeg" alt="achieve1">
+        <div class="achievement-text">Первый шаг</div>
+    </div>
+    <div class="achievement" id="achievement2">
+        <img class="achievement-icon" src="img/achievement2.jpeg" alt="achieve2">
+        <div class="achievement-text">Достижение 2</div>
+    </div>
+    <div class="achievement" id="achievement3">
+        <img class="achievement-icon" src="img/achievement3.jpeg" alt="achieve3">
+        <div class="achievement-text">Достижение 3</div>
+    </div>
+    <div class="achievement" id="achievement4">
+        <img class="achievement-icon" src="img/achievement4.jpeg" alt="achieve1">
+        <div class="achievement-text">Достижение 1</div>
+    </div>
+    <div class="achievement" id="achievement5">
+        <img class="achievement-icon" src="img/achievement5.jpeg" alt="achieve2">
+        <div class="achievement-text">Достижение 2</div>
+    </div>
+    <div class="achievement" id="achievement6">
+        <img class="achievement-icon" src="img/achievement6.jpeg" alt="achieve3">
+        <div class="achievement-text">Достижение 3</div>
+    </div>
+    <div class="achievement" id="achievement7">
+        <img class="achievement-icon" src="img/achievement7.jpeg" alt="achieve1">
+        <div class="achievement-text">Достижение 1</div>
+    </div>
+    <div class="achievement" id="achievement8">
+        <img class="achievement-icon" src="img/achievement8.jpeg" alt="achieve2">
+        <div class="achievement-text">Достижение 2</div>
+    </div>
+    <div class="achievement" id="achievement9">
+        <img class="achievement-icon" src="img/achievement9.jpeg" alt="achieve3">
+        <div class="achievement-text">Святой</div>
+    </div>
+    <div class="achievement" id="achievement10">
+        <img class="achievement-icon" src="img/achievement10.jpeg" alt="achieve1">
+        <div class="achievement-text">Достижение 1</div>
+    </div>
+    <div class="achievement" id="achievement11">
+        <img class="achievement-icon" src="img/achievement11.jpeg" alt="achieve1">
+        <div class="achievement-text">Достижение 1</div>
+    </div>
+    <div class="achievement" id="achievement12">
+        <img class="achievement-icon" src="img/achievement12.jpeg" alt="achieve2">
+        <div class="achievement-text">Достижение 2</div>
+    </div>
+    <div class="achievement" id="achievement13">
+        <img class="achievement-icon" src="img/achievement13.jpeg" alt="achieve3">
+        <div class="achievement-text">Знаток</div>
+    </div>
+</div>
+
+<div id="achievement-info" class="modal">
+    <button class="close-btn" onclick="closeInfo()">x</button>
+    <div id="a-name-desc">
+        <h2 id="a-name"></h2>
+        <p id="a-description"></p>
+    </div>
+    <p id="a-get"></p>
+    <p id="a-percent"></p>
+</div>
+
+<div id="achievement-info-not-auth" class="modal">
+    <button class="close-btn" onclick="closeInfo()">x</button>
+    <h2 style="font-weight: normal">Войдите, чтобы просматривать достижения</h2>
+    <button class="simple-btn loginBtn">Войти</button>
+</div>
+
+<div id="profile-panel">
+    <button class="profile-btn" onclick="switchProfile()">
+        <i class="fa fa-user"></i>
+    </button>
+    <div class="profile-content">
+        <h2>Профиль</h2>
+        <div>
+            <p id="username"></p>
+            <p id="email"></p>
+        </div>
+        <button id="loginBtn" class="simple-btn loginBtn">Войти</button>
+        <button id="mapBtn" class="simple-btn">Карта</button>
+        <button id="attractionListBtn" class="simple-btn" disabled>Список мест</button>
+        <button id="achievementsBtn" class="simple-btn" style="display: none">Мои достижения</button>
+        <button id="suggestBtn" class="simple-btn">Предложить место</button>
+        <button id="logoutBtn" class="simple-btn">Выйти</button>
+    </div>
+</div>
+
+<script src="js/profile.js"></script>
+<script src="js/achievements.js"></script>
+</body>
+</html>
