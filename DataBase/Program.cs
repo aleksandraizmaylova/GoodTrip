@@ -303,19 +303,10 @@ app.MapPost("/api/attractions/{attractionId:int}/status", async (HttpRequest req
 
 app.MapPost("/api/admin/attractions", async (HttpRequest request, CreateAttractionPayload? payload) =>
 {
-    var currentUser = await GetCurrentUserAsync(connectionString, request);
-    if (currentUser is null)
+    var adminCheck = await RequireAdminAsync(connectionString, request);
+    if (adminCheck.Error is not null)
     {
-        return Results.Json(
-            new { success = false, error = "Требуется авторизация" },
-            statusCode: StatusCodes.Status401Unauthorized);
-    }
-
-    if (!currentUser.IsAdmin)
-    {
-        return Results.Json(
-            new { success = false, error = "Доступ только для администратора" },
-            statusCode: StatusCodes.Status403Forbidden);
+        return adminCheck.Error;
     }
 
     if (payload is null)
@@ -392,6 +383,302 @@ app.MapPost("/api/admin/attractions", async (HttpRequest request, CreateAttracti
     {
         return Results.BadRequest(new { success = false, error = "Неверный category_id: такой категории не существует" });
     }
+});
+
+app.MapGet("/api/admin/categories", async (HttpRequest request) =>
+{
+    var adminCheck = await RequireAdminAsync(connectionString, request);
+    if (adminCheck.Error is not null)
+    {
+        return adminCheck.Error;
+    }
+
+    const string sql = """
+                       SELECT id, name, COALESCE(icon_url, '') AS icon_url, COALESCE(color, '') AS color
+                       FROM attraction_categories
+                       ORDER BY id;
+                       """;
+
+    var rows = new List<object>();
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        rows.Add(new
+        {
+            id = reader.GetInt32(0),
+            name = reader.GetString(1),
+            iconUrl = reader.GetString(2),
+            color = reader.GetString(3)
+        });
+    }
+
+    return Results.Ok(new { success = true, data = rows });
+});
+
+app.MapPost("/api/admin/categories", async (HttpRequest request, UpsertCategoryPayload? payload) =>
+{
+    var adminCheck = await RequireAdminAsync(connectionString, request);
+    if (adminCheck.Error is not null)
+    {
+        return adminCheck.Error;
+    }
+
+    var name = payload?.Name?.Trim();
+    if (string.IsNullOrWhiteSpace(name))
+    {
+        return Results.BadRequest(new { success = false, error = "name обязателен" });
+    }
+
+    const string sql = """
+                       INSERT INTO attraction_categories (name, icon_url, color)
+                       VALUES (@name, @iconUrl, @color)
+                       RETURNING id;
+                       """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("name", name);
+    command.Parameters.AddWithValue("iconUrl", (object?)payload?.IconUrl?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("color", (object?)payload?.Color?.Trim() ?? DBNull.Value);
+
+    try
+    {
+        var id = (int)(await command.ExecuteScalarAsync() ?? 0);
+        return Results.Ok(new { success = true, id });
+    }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { success = false, error = "Категория с таким названием уже существует" });
+    }
+});
+
+app.MapPut("/api/admin/categories/{id:int}", async (HttpRequest request, int id, UpsertCategoryPayload? payload) =>
+{
+    var adminCheck = await RequireAdminAsync(connectionString, request);
+    if (adminCheck.Error is not null)
+    {
+        return adminCheck.Error;
+    }
+
+    var name = payload?.Name?.Trim();
+    if (string.IsNullOrWhiteSpace(name))
+    {
+        return Results.BadRequest(new { success = false, error = "name обязателен" });
+    }
+
+    const string sql = """
+                       UPDATE attraction_categories
+                       SET name = @name,
+                           icon_url = @iconUrl,
+                           color = @color
+                       WHERE id = @id;
+                       """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("id", id);
+    command.Parameters.AddWithValue("name", name);
+    command.Parameters.AddWithValue("iconUrl", (object?)payload?.IconUrl?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("color", (object?)payload?.Color?.Trim() ?? DBNull.Value);
+
+    try
+    {
+        var updated = await command.ExecuteNonQueryAsync();
+        if (updated == 0)
+        {
+            return Results.NotFound(new { success = false, error = "Категория не найдена" });
+        }
+        return Results.Ok(new { success = true });
+    }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        return Results.Conflict(new { success = false, error = "Категория с таким названием уже существует" });
+    }
+});
+
+app.MapDelete("/api/admin/categories/{id:int}", async (HttpRequest request, int id) =>
+{
+    var adminCheck = await RequireAdminAsync(connectionString, request);
+    if (adminCheck.Error is not null)
+    {
+        return adminCheck.Error;
+    }
+
+    const string sql = "DELETE FROM attraction_categories WHERE id = @id;";
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("id", id);
+
+    try
+    {
+        var deleted = await command.ExecuteNonQueryAsync();
+        if (deleted == 0)
+        {
+            return Results.NotFound(new { success = false, error = "Категория не найдена" });
+        }
+        return Results.Ok(new { success = true });
+    }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+    {
+        return Results.BadRequest(new { success = false, error = "Нельзя удалить категорию: она используется в местах" });
+    }
+});
+
+app.MapGet("/api/admin/attractions", async (HttpRequest request) =>
+{
+    var adminCheck = await RequireAdminAsync(connectionString, request);
+    if (adminCheck.Error is not null)
+    {
+        return adminCheck.Error;
+    }
+
+    const string sql = """
+                       SELECT
+                           a.id,
+                           a.name,
+                           COALESCE(a.short_description, '') AS short_description,
+                           COALESCE(a.full_description, '') AS full_description,
+                           a.category_id,
+                           COALESCE(c.name, '') AS category_name,
+                           a.latitude,
+                           a.longitude,
+                           COALESCE(a.address, '') AS address,
+                           COALESCE(a.city, '') AS city,
+                           COALESCE(a.image_urls, ARRAY[]::TEXT[]) AS image_urls
+                       FROM attractions a
+                       LEFT JOIN attraction_categories c ON c.id = a.category_id
+                       ORDER BY a.id;
+                       """;
+
+    var rows = new List<object>();
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    await using var reader = await command.ExecuteReaderAsync();
+    while (await reader.ReadAsync())
+    {
+        var imageUrls = reader.GetFieldValue<string[]>(10);
+        rows.Add(new
+        {
+            id = reader.GetInt32(0),
+            name = reader.GetString(1),
+            shortDescription = reader.GetString(2),
+            fullDescription = reader.GetString(3),
+            categoryId = reader.IsDBNull(4) ? (int?)null : reader.GetInt32(4),
+            categoryName = reader.GetString(5),
+            latitude = reader.GetDecimal(6),
+            longitude = reader.GetDecimal(7),
+            address = reader.GetString(8),
+            city = reader.GetString(9),
+            imageUrls
+        });
+    }
+
+    return Results.Ok(new { success = true, data = rows });
+});
+
+app.MapPut("/api/admin/attractions/{id:int}", async (HttpRequest request, int id, CreateAttractionPayload? payload) =>
+{
+    var adminCheck = await RequireAdminAsync(connectionString, request);
+    if (adminCheck.Error is not null)
+    {
+        return adminCheck.Error;
+    }
+
+    if (payload is null)
+    {
+        return Results.BadRequest(new { success = false, error = "Тело запроса пустое" });
+    }
+
+    var name = payload.Name?.Trim();
+    if (string.IsNullOrWhiteSpace(name))
+    {
+        return Results.BadRequest(new { success = false, error = "name обязателен" });
+    }
+
+    if (payload.Latitude is < -90 or > 90)
+    {
+        return Results.BadRequest(new { success = false, error = "latitude должен быть в диапазоне [-90, 90]" });
+    }
+
+    if (payload.Longitude is < -180 or > 180)
+    {
+        return Results.BadRequest(new { success = false, error = "longitude должен быть в диапазоне [-180, 180]" });
+    }
+
+    var imageUrls = payload.ImageUrls?
+        .Where(url => !string.IsNullOrWhiteSpace(url))
+        .Select(url => url.Trim())
+        .ToArray() ?? Array.Empty<string>();
+
+    const string sql = """
+                       UPDATE attractions
+                       SET name = @name,
+                           short_description = @shortDescription,
+                           full_description = @fullDescription,
+                           category_id = @categoryId,
+                           latitude = @latitude,
+                           longitude = @longitude,
+                           address = @address,
+                           city = @city,
+                           image_urls = @imageUrls
+                       WHERE id = @id;
+                       """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("id", id);
+    command.Parameters.AddWithValue("name", name);
+    command.Parameters.AddWithValue("shortDescription", (object?)payload.ShortDescription?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("fullDescription", (object?)payload.FullDescription?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("categoryId", payload.CategoryId is > 0 ? payload.CategoryId.Value : DBNull.Value);
+    command.Parameters.AddWithValue("latitude", payload.Latitude);
+    command.Parameters.AddWithValue("longitude", payload.Longitude);
+    command.Parameters.AddWithValue("address", (object?)payload.Address?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("city", (object?)payload.City?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("imageUrls", imageUrls.Length > 0 ? imageUrls : DBNull.Value);
+
+    try
+    {
+        var updated = await command.ExecuteNonQueryAsync();
+        if (updated == 0)
+        {
+            return Results.NotFound(new { success = false, error = "Достопримечательность не найдена" });
+        }
+        return Results.Ok(new { success = true });
+    }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+    {
+        return Results.BadRequest(new { success = false, error = "Неверный category_id: такой категории не существует" });
+    }
+});
+
+app.MapDelete("/api/admin/attractions/{id:int}", async (HttpRequest request, int id) =>
+{
+    var adminCheck = await RequireAdminAsync(connectionString, request);
+    if (adminCheck.Error is not null)
+    {
+        return adminCheck.Error;
+    }
+
+    const string sql = "DELETE FROM attractions WHERE id = @id;";
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(sql, connection);
+    command.Parameters.AddWithValue("id", id);
+    var deleted = await command.ExecuteNonQueryAsync();
+    if (deleted == 0)
+    {
+        return Results.NotFound(new { success = false, error = "Достопримечательность не найдена" });
+    }
+    return Results.Ok(new { success = true });
 });
 
 app.Run();
@@ -553,6 +840,26 @@ static async Task<CurrentUser?> GetCurrentUserAsync(string connectionString, Htt
     }
 
     return new CurrentUser(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3));
+}
+
+static async Task<(CurrentUser? User, IResult? Error)> RequireAdminAsync(string connectionString, HttpRequest request)
+{
+    var currentUser = await GetCurrentUserAsync(connectionString, request);
+    if (currentUser is null)
+    {
+        return (null, Results.Json(
+            new { success = false, error = "Требуется авторизация" },
+            statusCode: StatusCodes.Status401Unauthorized));
+    }
+
+    if (!currentUser.IsAdmin)
+    {
+        return (null, Results.Json(
+            new { success = false, error = "Доступ только для администратора" },
+            statusCode: StatusCodes.Status403Forbidden));
+    }
+
+    return (currentUser, null);
 }
 
 static string? GetTokenFromRequest(HttpRequest request)
@@ -745,3 +1052,7 @@ public record CreateAttractionPayload(
     string? Address,
     string? City,
     string[]? ImageUrls);
+public record UpsertCategoryPayload(
+    string Name,
+    string? IconUrl,
+    string? Color);
