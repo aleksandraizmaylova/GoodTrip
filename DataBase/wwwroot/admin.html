@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GoodTrip Admin</title>
+    <link rel="stylesheet" href="/css/admin.css" />
+</head>
+<body>
+<main class="container">
+    <h1>Админ-панель: добавить достопримечательность</h1>
+
+    <form id="attraction-form" class="form">
+        <label>
+            Название *
+            <input type="text" id="name" required maxlength="200" />
+        </label>
+
+        <label>
+            Короткое описание
+            <textarea id="shortDescription" rows="3"></textarea>
+        </label>
+
+        <label>
+            Полное описание
+            <textarea id="fullDescription" rows="5"></textarea>
+        </label>
+
+        <label>
+            ID категории
+            <input type="number" id="categoryId" min="1" />
+        </label>
+
+        <div class="row">
+            <label>
+                Широта *
+                <input type="text" id="latitude" required inputmode="decimal" placeholder="56.8380 или 56,8380" />
+            </label>
+            <label>
+                Долгота *
+                <input type="text" id="longitude" required inputmode="decimal" placeholder="60.6050 или 60,6050" />
+            </label>
+        </div>
+
+        <label>
+            Адрес
+            <input type="text" id="address" maxlength="500" />
+        </label>
+
+        <label>
+            Город
+            <input type="text" id="city" maxlength="100" />
+        </label>
+
+        <label>
+            Ссылки на изображения (через запятую)
+            <textarea id="imageUrls" rows="3" placeholder="https://... , https://..."></textarea>
+        </label>
+
+        <button type="submit">Сохранить</button>
+    </form>
+
+    <p id="result" class="result"></p>
+</main>
+
+<script src="/js/admin.js"></script>
+</body>
+</html>

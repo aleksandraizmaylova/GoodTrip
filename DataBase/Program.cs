@@ -107,7 +107,7 @@ app.MapPost("/api/login", async (HttpRequest request) =>
     }
 
     const string loginSql = """
-                            SELECT id, username, email, password_hash
+                            SELECT id, username, email, password_hash, COALESCE(is_admin, FALSE)
                             FROM users
                             WHERE email = @email
                             LIMIT 1;
@@ -133,6 +133,7 @@ app.MapPost("/api/login", async (HttpRequest request) =>
     var userId = reader.GetInt32(0);
     var username = reader.GetString(1);
     var email = reader.GetString(2);
+    var isAdmin = reader.GetBoolean(4);
 
     var sessionToken = await CreateSessionAsync(connectionString, userId);
     request.HttpContext.Response.Cookies.Append("auth_token", sessionToken, new CookieOptions
@@ -151,7 +152,8 @@ app.MapPost("/api/login", async (HttpRequest request) =>
         {
             id = userId,
             username,
-            email
+            email,
+            isAdmin
         }
     });
 });
@@ -167,7 +169,7 @@ app.MapGet("/api/me", async (HttpRequest request) =>
     return Results.Ok(new
     {
         success = true,
-        user = new { id = currentUser.Id, username = currentUser.Username, email = currentUser.Email }
+        user = new { id = currentUser.Id, username = currentUser.Username, email = currentUser.Email, isAdmin = currentUser.IsAdmin }
     });
 });
 
@@ -297,6 +299,99 @@ app.MapPost("/api/attractions/{attractionId:int}/status", async (HttpRequest req
     await upsertCmd.ExecuteNonQueryAsync();
 
     return Results.Ok(new { success = true, status });
+});
+
+app.MapPost("/api/admin/attractions", async (HttpRequest request, CreateAttractionPayload? payload) =>
+{
+    var currentUser = await GetCurrentUserAsync(connectionString, request);
+    if (currentUser is null)
+    {
+        return Results.Json(
+            new { success = false, error = "Требуется авторизация" },
+            statusCode: StatusCodes.Status401Unauthorized);
+    }
+
+    if (!currentUser.IsAdmin)
+    {
+        return Results.Json(
+            new { success = false, error = "Доступ только для администратора" },
+            statusCode: StatusCodes.Status403Forbidden);
+    }
+
+    if (payload is null)
+    {
+        return Results.BadRequest(new { success = false, error = "Тело запроса пустое" });
+    }
+
+    var name = payload.Name?.Trim();
+    if (string.IsNullOrWhiteSpace(name))
+    {
+        return Results.BadRequest(new { success = false, error = "name обязателен" });
+    }
+
+    if (payload.Latitude is < -90 or > 90)
+    {
+        return Results.BadRequest(new { success = false, error = "latitude должен быть в диапазоне [-90, 90]" });
+    }
+
+    if (payload.Longitude is < -180 or > 180)
+    {
+        return Results.BadRequest(new { success = false, error = "longitude должен быть в диапазоне [-180, 180]" });
+    }
+
+    var imageUrls = payload.ImageUrls?
+        .Where(url => !string.IsNullOrWhiteSpace(url))
+        .Select(url => url.Trim())
+        .ToArray() ?? Array.Empty<string>();
+
+    const string insertSql = """
+                             INSERT INTO attractions (
+                                 name,
+                                 short_description,
+                                 full_description,
+                                 category_id,
+                                 latitude,
+                                 longitude,
+                                 address,
+                                 city,
+                                 image_urls
+                             )
+                             VALUES (
+                                 @name,
+                                 @shortDescription,
+                                 @fullDescription,
+                                 @categoryId,
+                                 @latitude,
+                                 @longitude,
+                                 @address,
+                                 @city,
+                                 @imageUrls
+                             )
+                             RETURNING id;
+                             """;
+
+    await using var connection = new NpgsqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new NpgsqlCommand(insertSql, connection);
+    command.Parameters.AddWithValue("name", name);
+    command.Parameters.AddWithValue("shortDescription", (object?)payload.ShortDescription?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("fullDescription", (object?)payload.FullDescription?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("categoryId", payload.CategoryId is > 0 ? payload.CategoryId.Value : DBNull.Value);
+    command.Parameters.AddWithValue("latitude", payload.Latitude);
+    command.Parameters.AddWithValue("longitude", payload.Longitude);
+    command.Parameters.AddWithValue("address", (object?)payload.Address?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("city", (object?)payload.City?.Trim() ?? DBNull.Value);
+    command.Parameters.AddWithValue("imageUrls", imageUrls.Length > 0 ? imageUrls : DBNull.Value);
+
+    try
+    {
+        var newId = (int)(await command.ExecuteScalarAsync() ?? 0);
+        return Results.Ok(new { success = true, id = newId });
+    }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+    {
+        return Results.BadRequest(new { success = false, error = "Неверный category_id: такой категории не существует" });
+    }
 });
 
 app.Run();
@@ -439,7 +534,7 @@ static async Task<CurrentUser?> GetCurrentUserAsync(string connectionString, Htt
     }
 
     const string sql = """
-                       SELECT u.id, u.username, u.email
+                       SELECT u.id, u.username, u.email, COALESCE(u.is_admin, FALSE)
                        FROM user_sessions s
                        JOIN users u ON u.id = s.user_id
                        WHERE s.token = @token AND s.expires_at > NOW()
@@ -457,7 +552,7 @@ static async Task<CurrentUser?> GetCurrentUserAsync(string connectionString, Htt
         return null;
     }
 
-    return new CurrentUser(reader.GetInt32(0), reader.GetString(1), reader.GetString(2));
+    return new CurrentUser(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3));
 }
 
 static string? GetTokenFromRequest(HttpRequest request)
@@ -531,14 +626,19 @@ static async Task EnsureDatabaseInitializedAsync(string connectionString, string
         var existsObj = await existsCmd.ExecuteScalarAsync();
         var schemaExists = existsObj is bool b && b;
 
-        if (schemaExists)
+        if (!schemaExists)
         {
-            return;
+            var sqlScript = await File.ReadAllTextAsync(scriptPath);
+            await using var command = new NpgsqlCommand(sqlScript, connection);
+            await command.ExecuteNonQueryAsync();
         }
 
-        var sqlScript = await File.ReadAllTextAsync(scriptPath);
-        await using var command = new NpgsqlCommand(sqlScript, connection);
-        await command.ExecuteNonQueryAsync();
+        const string adminColumnSql = """
+                                      ALTER TABLE users
+                                      ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+                                      """;
+        await using var adminColumnCommand = new NpgsqlCommand(adminColumnSql, connection);
+        await adminColumnCommand.ExecuteNonQueryAsync();
     }
     finally
     {
@@ -633,5 +733,15 @@ static double GeoDistanceMeters(decimal lat1, decimal lon1, decimal lat2, decima
 }
 
 public record AuthPayload(string Username, string Email, string Password);
-public record CurrentUser(int Id, string Username, string Email);
+public record CurrentUser(int Id, string Username, string Email, bool IsAdmin);
 public record AttractionStatusPayload(string Status);
+public record CreateAttractionPayload(
+    string Name,
+    string? ShortDescription,
+    string? FullDescription,
+    int? CategoryId,
+    decimal Latitude,
+    decimal Longitude,
+    string? Address,
+    string? City,
+    string[]? ImageUrls);
