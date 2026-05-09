@@ -13,6 +13,7 @@ body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Seg
     display: flex; align-items: center; gap: 6px;
 }
 .filter-chip.active { background: #3b82f6; color: white; border-color: #3b82f6; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4); }
+.filter-chip.exclude { background: #ef4444; color: white; border-color: #ef4444; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4); }
 .filter-divider { width: 1px; height: 24px; background: #d1d5db; margin: 0 4px; flex-shrink: 0; }
 
 .custom-marker {

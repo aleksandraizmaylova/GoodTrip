@@ -11,8 +11,21 @@ let mapPlacemarks = {};
 
 const allAvailableCats = ["museum", "park", "monument", "temple"];
 let activeCategories = new Set(allAvailableCats);
-let filterFav = false;
-let filterVis = false;
+/** @type {'off'|'include'|'exclude'} */
+let statusFilterFav = 'off';
+/** @type {'off'|'include'|'exclude'} */
+let statusFilterVis = 'off';
+
+function cycleStatusFilter(current) {
+    if (current === 'off') return 'include';
+    if (current === 'include') return 'exclude';
+    return 'off';
+}
+
+function applyTriStateChip(el, mode) {
+    el.classList.toggle('active', mode === 'include');
+    el.classList.toggle('exclude', mode === 'exclude');
+}
 
 function toggleCategory(cat) {
     if (activeCategories.has(cat)) activeCategories.delete(cat);
@@ -31,12 +44,16 @@ function toggleAllCategories() {
 
 function toggleStatus(status) {
     if (status === 'favorites') {
-        filterFav = !filterFav;
-        if (filterFav) filterVis = false;
+        statusFilterFav = cycleStatusFilter(statusFilterFav);
+        if (statusFilterFav === 'include' && statusFilterVis === 'include') {
+            statusFilterVis = 'off';
+        }
     }
     if (status === 'visited') {
-        filterVis = !filterVis;
-        if (filterVis) filterFav = false;
+        statusFilterVis = cycleStatusFilter(statusFilterVis);
+        if (statusFilterVis === 'include' && statusFilterFav === 'include') {
+            statusFilterFav = 'off';
+        }
     }
     updateFiltersUI();
 }
@@ -52,8 +69,8 @@ function updateFiltersUI() {
         else btn.classList.remove('active');
     });
 
-    document.getElementById('filter-fav').classList.toggle('active', filterFav);
-    document.getElementById('filter-vis').classList.toggle('active', filterVis);
+    applyTriStateChip(document.getElementById('filter-fav'), statusFilterFav);
+    applyTriStateChip(document.getElementById('filter-vis'), statusFilterVis);
 
     updateMarkersOnMap();
 }
@@ -114,8 +131,10 @@ function updateMarkersOnMap() {
 
         if (cat !== "default" && !activeCategories.has(cat)) isVisible = false;
         if (cat === "default" && activeCategories.size === 0) isVisible = false;
-        if (filterFav && !isFav) isVisible = false;
-        if (filterVis && !isVis) isVisible = false;
+        if (statusFilterFav === 'include' && !isFav) isVisible = false;
+        if (statusFilterFav === 'exclude' && isFav) isVisible = false;
+        if (statusFilterVis === 'include' && !isVis) isVisible = false;
+        if (statusFilterVis === 'exclude' && isVis) isVisible = false;
 
         placemark.options.set('visible', isVisible);
 
