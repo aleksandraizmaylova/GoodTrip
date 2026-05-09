@@ -30,8 +30,14 @@ function toggleAllCategories() {
 }
 
 function toggleStatus(status) {
-    if (status === 'favorites') filterFav = !filterFav;
-    if (status === 'visited') filterVis = !filterVis;
+    if (status === 'favorites') {
+        filterFav = !filterFav;
+        if (filterFav) filterVis = false;
+    }
+    if (status === 'visited') {
+        filterVis = !filterVis;
+        if (filterVis) filterFav = false;
+    }
     updateFiltersUI();
 }
 
