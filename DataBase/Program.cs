@@ -885,6 +885,7 @@ static async Task EnsureDatabaseInitializedAsync(string connectionString, string
     {
         throw new FileNotFoundException("Database initialization script was not found.", scriptPath);
     }
+    var seedScriptPath = Path.Combine(contentRootPath, "DB_seed.sql");
 
     // Connect with backoff to avoid restart-loops on VM when Postgres isn't ready yet.
     // Fail fast on wrong credentials (28P01), because retries won't help.
@@ -946,6 +947,25 @@ static async Task EnsureDatabaseInitializedAsync(string connectionString, string
                                       """;
         await using var adminColumnCommand = new NpgsqlCommand(adminColumnSql, connection);
         await adminColumnCommand.ExecuteNonQueryAsync();
+
+        // Apply idempotent seed updates (e.g., attractions coordinates) even when schema already exists.
+        // This is intentionally best-effort to avoid VM restart loops if seed has a transient issue.
+        if (File.Exists(seedScriptPath))
+        {
+            try
+            {
+                var seedSql = await File.ReadAllTextAsync(seedScriptPath);
+                await using var seedCmd = new NpgsqlCommand(seedSql, connection)
+                {
+                    CommandTimeout = 30
+                };
+                await seedCmd.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[DB] Seed script failed: {ex.Message}");
+            }
+        }
     }
     finally
     {
