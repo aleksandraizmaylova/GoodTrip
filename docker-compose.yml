@@ -20,7 +20,10 @@ services:
     restart: unless-stopped
 
   api:
-    image: el111/goodtrip-api:latest
+    #image: el111/goodtrip-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: goodtrip-api
     depends_on:
       db:
