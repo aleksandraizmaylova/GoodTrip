@@ -22,6 +22,25 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("AllowAll");
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.Equals("/admin.html", StringComparison.OrdinalIgnoreCase))
+    {
+        var currentUser = await GetCurrentUserAsync(connectionString, context.Request);
+        if (currentUser is null || !currentUser.IsAdmin)
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                success = false,
+                error = "Доступ только для администратора"
+            });
+            return;
+        }
+    }
+
+    await next();
+});
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
